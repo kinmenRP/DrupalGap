@@ -29,6 +29,39 @@ version of DrupalGap to another.
 
 # Version Change Notes for Developers
 
+## 7.x-1.x => 7.x-2.x
+
+The upgrade from DrupalGap 1.x to 2.x will see many vast improvements. First and
+foremost, we'll be utilizing Angular JS instead of jQuery Mobile as our
+framework.
+
+### theme .js files
+
+Your theme's .js file is no longer loaded dynamically, you must include it in
+your index.html file(s), for example:
+
+```
+<script type="text/javascript" charset="utf-8" src="app/themes/my_theme/my_theme.js"></script>
+```
+
+### $.each() loops
+
+OLD WAY
+```
+$.each(items, function(delta, item) {
+  item.foo = 'bar';
+});
+```
+
+NEW WAY
+```
+for (var delta in items) {
+  if (!items.hasOwnProperty(delta)) { continue; }
+  var item = items[delta];
+  item.foo = 'bar';
+}
+```
+
 ## 7.x-1.0-rc4 => 7.x-1.0-rc5
 
 ### Build Web Apps by Default
