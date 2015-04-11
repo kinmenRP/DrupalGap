@@ -8,12 +8,14 @@ function drupalgap_block_load(delta) {
   try {
     var block = null;
     if (drupalgap.blocks) {
-      $.each(drupalgap.blocks, function(index, object) {
-          if (object[delta]) {
-            block = object[delta];
-            return false;
-          }
-      });
+      for (var index in drupalgap.blocks) {
+        if (!drupalgap.blocks.hasOwnProperty(index)) { continue; }
+        var object = drupalgap.blocks[index];
+        if (object[delta]) {
+          block = object[delta];
+          break;
+        }
+      }
     }
     if (block == null) {
       var msg = 'drupalgap_block_load - failed to load "' + delta + '" block!';
@@ -70,6 +72,9 @@ function drupalgap_block_render(region, current_path, block_delta,
           block_delta,
           region
         );
+      }
+      else {
+        console.log('WARNING: drupalgap_block_render() - failed to load block (' + block_delta + ')');
       }
     }
     return html;
