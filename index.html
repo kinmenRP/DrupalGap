@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html>
+<html ng-app="dg">
     <head>
     
       <title>DrupalGap</title>
@@ -9,10 +9,17 @@
       <!-- WARNING: for iOS 7, remove the width=device-width and height=device-height attributes. See https://issues.apache.org/jira/browse/CB-4323 -->
       <meta name="viewport" content="user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1, width=device-width, height=device-height" />
       
-      <!-- jQuery Mobile -->
-      <link rel="stylesheet" href="jquery.mobile-1.4.2.min.css" />
-      <script src="jquery-1.9.1.min.js"></script>
-      <script src="jquery.mobile-1.4.2.min.js"></script>
+      <!-- Bootstrap -->
+      <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap.min.css">
+      <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.3.4/css/bootstrap-theme.min.css">
+
+      <!-- Angular -->
+      <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.15/angular.min.js"></script>
+
+      <!-- Init Angular App -->
+      <script>
+        var dg = angular.module('dg', []);
+      </script>
       
       <!-- jDrupal -->
       <script type="text/javascript" charset="utf-8" src="jdrupal-7.x-1.1.min.js"></script>
@@ -20,25 +27,17 @@
       <!-- DrupalGap -->
       <script type="text/javascript" charset="utf-8" src="bin/drupalgap.js"></script>
       <script type="text/javascript" charset="utf-8" src="app/settings.js"></script>
+      <script type="text/javascript" charset="utf-8" src="themes/spi/spi.js"></script>
+      <script type="text/ng-template" id="page.tpl.html" src="themes/spi/page.tpl.html"></script>
       <link rel="stylesheet" href="drupalgap.css" />
+      <script>
+        dg.controller('drupalgap_onload', ['$scope', '$sce', drupalgap_onload]);
+      </script>
 
     </head>
-    <body>
+    <body ng-controller="drupalgap_onload">
 
-      <!-- Mobile Application Splash Screen -->
-      <div id="_drupalgap_splash" data-role="page">
-         <div data-role="header" data-theme="b"><h2>DrupalGap</h2></div>
-         <div class="ui-content" data-role="content">
-            <div id="_drupalgap_splash_content">
-              <img src="images/drupalgap.jpg" alt="DrupalGap" style="position: absolute; top: 50%; left: 50%; margin-left: -64px; margin-top: -64px;" />
-            </div>
-         </div>
-      </div>
-
-      <!-- Load DrupalGap -->
-      <script type="text/javascript">
-        drupalgap_onload();
-      </script>
+      <div ng-include src="'themes/spi/page.tpl.html'"></div>
 
     </body>
 </html>
