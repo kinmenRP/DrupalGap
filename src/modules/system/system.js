@@ -38,14 +38,16 @@ function system_block_info() {
     };
     // Make additional blocks for each system menu.
     var system_menus = menu_list_system_menus();
-    $.each(system_menus, function(menu_name, menu) {
-        var block_delta = menu.menu_name;
-        blocks[block_delta] = {
-          name: block_delta,
-          delta: block_delta,
-          module: 'menu'
-        };
-    });
+    for (var menu_name in system_menus) {
+      if (!system_menus.hasOwnProperty(menu_name)) { continue; }
+      var menu = system_menus[menu_name];
+      var block_delta = menu.menu_name;
+      blocks[block_delta] = {
+        name: block_delta,
+        delta: block_delta,
+        module: 'menu'
+      };
+    }
     return blocks;
 }
 
@@ -69,11 +71,13 @@ function system_block_view(delta) {
         // clear out the messages array.
         var html = '';
         if (drupalgap.messages.length == 0) { return html; }
-        $.each(drupalgap.messages, function(index, msg) {
-            html += '<div class="messages ' + msg.type + '">' +
-              msg.message +
-            '</div>';
-        });
+        for (var index in drupalgap.messages) {
+          if (!drupalgap.messages.hasOwnProperty(index)) { continue; }
+          var msg = drupalgap.messages[index];
+          html += '<div class="messages ' + msg.type + '">' +
+            msg.message +
+          '</div>';
+        }
         drupalgap.messages = [];
         return html;
         break;
