@@ -14,9 +14,11 @@ function drupalgap_taxonomy_vocabularies_extract(taxonomy_vocabularies) {
     var results = false;
     if (taxonomy_vocabularies && taxonomy_vocabularies.length > 0) {
       results = {};
-      $.each(taxonomy_vocabularies, function(index, vocabulary) {
-          results[vocabulary.machine_name] = vocabulary;
-      });
+      for (var index in taxonomy_vocabularies) {
+        if (!taxonomy_vocabularies.hasOwnProperty(index)) { continue; }
+        var vocabulary = taxonomy_vocabularies[index];
+        results[vocabulary.machine_name] = vocabulary;
+      }
     }
     return results;
   }
