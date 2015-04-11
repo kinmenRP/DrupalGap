@@ -279,7 +279,6 @@ function _drupalgap_goto_prepare_path(path) {
     if (typeof arguments[1] !== 'undefined' && arguments[1]) {
       var pos = path.indexOf('?');
       if (pos != -1 && pos != path.length - 1) {
-        dpm('a ? is in the path! ' + path);
         var query = path.substr(pos + 1, path.length - pos);
         path = path.substr(0, pos);
         var parts = query.split('&');
