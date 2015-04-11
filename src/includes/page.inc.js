@@ -80,45 +80,6 @@ function _GET() {
 }
 
 /**
- * Each time we use drupalgap_goto to change a page, this function is called on
- * the pagebeforehange event. If we're not moving backwards, or navigating to
- * the same page, this will preproccesses the page, then processes it.
- */
-$(document).on('pagebeforechange', function(e, data) {
-    try {
-      // If we're moving backwards, reset drupalgap.back and return.
-      if (drupalgap && drupalgap.back) {
-        drupalgap.back = false;
-        return;
-      }
-      // If the jqm active page url is the same as the page id of the current
-      // path, return.
-      if (
-        drupalgap_jqm_active_page_url() ==
-        drupalgap_get_page_id(drupalgap_path_get())
-      ) { return; }
-      // We only want to process the page we are going to, not the page we are
-      // coming from. When data.toPage is a string that is our destination page.
-      if (typeof data.toPage === 'string') {
-
-        // If drupalgap_goto() determined that it is necessary to prevent the
-        // default page from reloading, then we'll skip the page
-        // processing and reset the prevention boolean.
-        if (drupalgap && !drupalgap.page.process) {
-          drupalgap.page.process = true;
-        }
-        else if (drupalgap) {
-          // Pre process, then process the page.
-          template_preprocess_page(drupalgap.page.variables);
-          template_process_page(drupalgap.page.variables);
-        }
-
-      }
-    }
-    catch (error) { console.log('pagebeforechange - ' + error); }
-});
-
-/**
  * Implementation of template_preprocess_page().
  * @param {Object} variables
  */
@@ -151,18 +112,35 @@ function template_process_page(variables) {
     // Execute the active menu handler to assemble the page output. We need to
     // do this before we render the regions below.
     drupalgap.output = menu_execute_active_handler();
+    
+    var jqm = drupalgap_is_jqm();
+    
     // For each region, render it, then replace the placeholder in the page's
     // html with the rendered region.
     var page_id = drupalgap_get_page_id(drupalgap_path);
-    var page_html = $('#' + page_id).html();
-    if (!page_html) { return; }
-    $.each(drupalgap.theme.regions, function(index, region) {
+    var page_html = null;
+    if (jqm) {
+      var page_html = $('#' + page_id).html();
+      if (!page_html) { return; }
+    }
+    for (var index in drupalgap.theme.regions) {
+      if (!drupalgap.theme.regions.hasOwnProperty(index)) { continue; }
+      var region = drupalgap.theme.regions[index];
+      if (jqm) {
         page_html = page_html.replace(
           '{:' + region.name + ':}',
           drupalgap_render_region(region)
         );
-    });
-    $('#' + page_id).html(page_html);
+      }
+      else {
+        // For Angular, just render the region in the scope.
+        page_html = drupalgap_render_region(region);
+        _dg_scope.$apply(function() {
+            _dg_scope[region.name] = _dg_sce.trustAsHtml(page_html);
+        });
+      }
+    }
+    if (jqm) { $('#' + page_id).html(page_html); }
   }
   catch (error) { console.log('template_process_page - ' + error); }
 }
@@ -184,6 +162,30 @@ function drupalgap_get_page_id(path) {
 }
 
 /**
+ *
+ */
+function drupalgap_prepare_page_attributes(options, menu_link) {
+  try {
+    var attributes = {
+      id: options.page_id,
+      'data-role': 'page'
+    };
+    if (drupalgap_is_jqm()) {
+      attributes =
+        $.extend(true, attributes, menu_link.options.attributes);
+    }
+    else {
+      attributes =
+        angular.extend({}, attributes, menu_link.options.attributes)
+    }
+    attributes['class'] +=
+      ' ' + drupalgap_page_class_get(drupalgap.router_path);
+    return attributes;
+  }
+  catch (error) { console.log('drupalgap_prepare_page_attributes - ' + error); }
+}
+
+/**
  * Given a page id, the theme's page.tpl.html string, and the menu link object
  * (all bundled in options) this takes the page template html and adds it to the
  * DOM. It doesn't actually render the page, that is taken care of by the
@@ -197,14 +199,10 @@ function drupalgap_add_page_to_dom(options) {
     // placeholder. We have to manually add our default class name after the
     // extend until this issue is resolved:
     // https://github.com/signalpoint/DrupalGap/issues/321
-    var attributes = {
-      id: options.page_id,
-      'data-role': 'page'
-    };
-    attributes =
-      $.extend(true, attributes, options.menu_link.options.attributes);
-    attributes['class'] +=
-      ' ' + drupalgap_page_class_get(drupalgap.router_path);
+    var attributes = drupalgap_prepare_page_attributes(
+      options,
+      options.menu_link
+    );
     options.html = options.html.replace(
       /{:drupalgap_page_attributes:}/g,
       drupalgap_attributes(attributes)
@@ -293,6 +291,8 @@ function drupalgap_page_class_get(router_path) {
  */
 function drupalgap_page_in_dom(page_id) {
   try {
+    return document.getElementById('my_new_div') ? true: false;
+    // @deprecated
     var pages = $("body div[data-role$='page']");
     var page_in_dom = false;
     if (pages && pages.length > 0) {
@@ -346,17 +346,16 @@ function drupalgap_render_page() {
     // based on the output type. The output type will either be an html string
     // or a drupalgap render object.
     var output = drupalgap.output;
-    var output_type = $.type(output);
     var content = '';
 
     // If the output came back as a string, we can render it as is. If the
     // output came back as on object, render each element in it through the
     // theme system.
-    if (output_type === 'string') {
+    if (typeof output === 'string') {
       // The page came back as an html string.
       content = output;
     }
-    else if (output_type === 'object') {
+    else if (typeof output === 'object') {
       // The page came back as a render object. Let's define the names of
       // variables that are reserved for theme processing.
       var render_variables = ['theme', 'view_mode', 'language'];
@@ -388,29 +387,31 @@ function drupalgap_render_page() {
               // Replace each placeholder with html.
               // @todo - each placeholder should have its own container div and
               // unique id.
-              $.each(placeholders, function(index, placeholder) {
-                  var html = '';
-                  if (output[placeholder]) {
-                    // Grab the element variable from the output.
-                    var element = output[placeholder];
-                    // If it is markup, render it as is, if it is themeable,
-                    // then theme it.
-                    if (output[placeholder].markup) {
-                      html = output[placeholder].markup;
-                    }
-                    else if (output[placeholder].theme) {
-                      html = theme(output[placeholder].theme, element);
-                    }
-                    // Now remove the variable from the output.
-                    delete output[placeholder];
+              for (var index in placeholders) {
+                if (!placeholders.hasOwnProperty(index)) { continue; }
+                var placeholder = placeholders[index];
+                var html = '';
+                if (output[placeholder]) {
+                  // Grab the element variable from the output.
+                  var element = output[placeholder];
+                  // If it is markup, render it as is, if it is themeable,
+                  // then theme it.
+                  if (output[placeholder].markup) {
+                    html = output[placeholder].markup;
                   }
-                  // Now replace the placeholder with the html, even if it was
-                  // empty.
-                  template_file_html = template_file_html.replace(
-                    '{:' + placeholder + ':}',
-                    html
-                  );
-              });
+                  else if (output[placeholder].theme) {
+                    html = theme(output[placeholder].theme, element);
+                  }
+                  // Now remove the variable from the output.
+                  delete output[placeholder];
+                }
+                // Now replace the placeholder with the html, even if it was
+                // empty.
+                template_file_html = template_file_html.replace(
+                  '{:' + placeholder + ':}',
+                  html
+                );
+              }
             }
             else {
               // There were no place holders found, do nothing, ok.
@@ -439,11 +440,13 @@ function drupalgap_render_page() {
       // Iterate over any remaining variables and theme them.
       // @todo - each remaining variables should have its own container div and
       // unique id, similar to the placeholder div containers mentioned above.
-      $.each(output, function(element, variables) {
-          if ($.inArray(element, render_variables) == -1) {
-            content += theme(variables.theme, variables);
-          }
-      });
+      for (var element in output) {
+        if (!output.hasOwnProperty(element)) { continue; }
+        var variables = output[element];
+        if (!in_array(element, render_variables)) {
+          content += theme(variables.theme, variables);
+        }
+      }
     }
 
     // Now that we are done assembling the content into an html string, we can
