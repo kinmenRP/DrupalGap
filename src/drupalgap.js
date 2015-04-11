@@ -4,6 +4,10 @@ var drupalgap = drupalgap || drupalgap_init(); // Do not remove this line.
 // Init _GET for url path query strings.
 var _dg_GET = _dg_GET || {};
 
+// Angular globals.
+var _dg_scope = null;
+var _dg_sce = null;
+
 /**
  * Initializes the drupalgap json object.
  * @return {Object}
@@ -100,6 +104,10 @@ function drupalgap_init() {
  */
 function drupalgap_onload() {
   try {
+
+    // Set aside the arguments if any.
+    _dg_scope = arguments[0] ? arguments[0] : null;
+    _dg_sce = arguments[1] ? arguments[1] : null;
 
     // Remove any hash in case the app is restarting.
     window.location.hash = '';
@@ -249,6 +257,11 @@ function _drupalgap_deviceready() {
  */
 function drupalgap_bootstrap() {
   try {
+
+    // Grab the scope, if any.
+    $scope = _dg_scope;
+    if ($scope) { dg_init_scope($scope); }
+
     // Load up any contrib and/or custom modules (the DG core moodules have
     // already been loaded at this point), load the theme and all blocks. Then
     // build the menu router, load the menus, and build the theme registry.
@@ -266,89 +279,137 @@ function drupalgap_bootstrap() {
 }
 
 /**
+ * Initializes the DrupalGap scope.
+ */
+function dg_init_scope($scope) {
+  try {
+    // Provide a way to load module JS files into an angular app.
+    // @see http://stackoverflow.com/a/22567629/763010
+    $scope.loadScript = function(url, type, charset) {
+        if (type===undefined) type = 'text/javascript';
+        if (url) {
+            var script = document.querySelector("script[src*='"+url+"']");
+            if (!script) {
+                var heads = document.getElementsByTagName("head");
+                if (heads && heads.length) {
+                    var head = heads[0];
+                    if (head) {
+                        script = document.createElement('script');
+                        script.setAttribute('src', url);
+                        script.setAttribute('type', type);
+                        if (charset) script.setAttribute('charset', charset);
+                        head.appendChild(script);
+                    }
+                }
+            }
+            return script;
+        }
+    };
+  }
+  catch (error) { console.log('dg_init_scope - ' + error); }
+}
+
+/**
  * Loads any contrib or custom modules specifed in the settings.js file. Then
  * invoke hook_install() on all modules, including core.
  */
 function drupalgap_load_modules() {
   try {
-    var module_types = ['contrib', 'custom'];
+
     // We only need to load contrib and custom modules because core modules are
     // already included in the binary.
-    $.each(module_types, function(index, bundle) {
-        // Let's be nice and try to load any old drupalgap.modules declarations
-        // in developers settings.js files for a while, but throw a warning to
-        // encourage them to update. This code can be removed after a few
-        // releases to help developers get caught up without angering them.
-        if (
-          drupalgap.modules &&
-          drupalgap.modules[bundle] &&
-          drupalgap.modules[bundle].length != 0
-        ) {
-          $.each(drupalgap.modules[bundle], function(index, module) {
-              if (module.name) {
-                var msg = 'WARNING: The module "' + module.name + '" defined ' +
-                  'in settings.js needs to be added to ' +
-                  'Drupal.modules[\'' + bundle + '\'] instead! See ' +
-                  'default.settings.js for examples on the new syntax!';
-                console.log(msg);
-                Drupal.modules[bundle][module.name] = module;
-              }
-          });
+    var module_types = ['contrib', 'custom'];
+    for (var i = 0; i < module_types.length; i++) {
+      var bundle = module_types[i];
+      for (var module_name in Drupal.modules[bundle]) {
+        if(!Drupal.modules[bundle].hasOwnProperty(module_name)) { continue; }
+        var module = Drupal.modules[bundle][module_name];
+
+        // If the module object is empty, initialize a module object.
+        if (empty(module)) {
+          Drupal.modules[bundle][module_name] =
+              module_object_template(module_name);
+            module = Drupal.modules[bundle][module_name];
         }
-        $.each(Drupal.modules[bundle], function(module_name, module) {
-            // If the module object is empty, initialize a module object.
-            if ($.isEmptyObject(module)) {
-              Drupal.modules[bundle][module_name] =
-                module_object_template(module_name);
-              module = Drupal.modules[bundle][module_name];
-            }
-            // If the module's name isn't set, set it.
-            if (!module.name) {
-              Drupal.modules[bundle][module_name].name = module_name;
-              module = Drupal.modules[bundle][module_name];
-            }
-            // Determine module directory.
-            var dir = drupalgap_modules_get_bundle_directory(bundle);
-            module_base_path = dir + '/' + module.name;
-            // Add module .js file to array of paths to load.
-            module_path = module_base_path + '/' + module.name + '.js';
-            modules_paths = [module_path];
-            // If there are any includes with this module, add them to the
-            // list of paths to include.
-            if (module.includes != null && module.includes.length != 0) {
-              $.each(module.includes, function(include_index, include_object) {
-                modules_paths.push(
-                  module_base_path + '/' + include_object.name + '.js'
-                );
+
+        // If the module's name isn't set, set it.
+        if (!module.name) {
+          Drupal.modules[bundle][module_name].name = module_name;
+          module = Drupal.modules[bundle][module_name];
+        }
+
+        // Determine module's directory.
+        var dir = drupalgap_modules_get_bundle_directory(bundle);
+        module_base_path = dir + '/' + module.name;
+
+        // Add module .js file to array of paths to load.
+        module_path = module_base_path + '/' + module.name + '.js';
+        modules_paths = [module_path];
+
+        // If there are any includes with this module, add them to the
+        // list of paths to include.
+        if (module.includes != null && module.includes.length != 0) {
+          for (var include_index in module.includes) {
+            if (!module.includes.hasOwnProperty(include_index)) { continue; }
+            var include_object = module.includes[include_index];
+            modules_paths.push(
+              module_base_path + '/' + include_object.name + '.js'
+            );
+          }
+        }
+
+        // Now load the module's JavaScript into scope.
+        var js_framework = drupalgap_js_framework();
+        switch (js_framework) {
+
+          // jQuery mobile
+          case 'jqm':
+            jQuery.each(modules_paths,
+            function(modules_paths_index, modules_paths_object) {
+              jQuery.ajax({
+                  async: false,
+                  type: 'GET',
+                  url: modules_paths_object,
+                  data: null,
+                  success: function() {
+                    if (Drupal.settings.debug) { dpm(modules_paths_object); }
+                  },
+                  dataType: 'script',
+                  error: function(xhr, textStatus, errorThrown) {
+                    var msg = 'Failed to load module! (' + module.name + ')';
+                    dpm(msg);
+                    dpm(modules_paths_object);
+                    dpm(textStatus);
+                    dpm(errorThrown.message);
+                    drupalgap_alert(msg);
+                  }
               });
             }
-            // Now load all the paths for this module.
-            $.each(modules_paths,
-              function(modules_paths_index, modules_paths_object) {
-                jQuery.ajax({
-                    async: false,
-                    type: 'GET',
-                    url: modules_paths_object,
-                    data: null,
-                    success: function() {
-                      if (Drupal.settings.debug) { dpm(modules_paths_object); }
-                    },
-                    dataType: 'script',
-                    error: function(xhr, textStatus, errorThrown) {
-                      var msg = 'Failed to load module! (' + module.name + ')';
-                      dpm(msg);
-                      dpm(modules_paths_object);
-                      dpm(textStatus);
-                      dpm(errorThrown.message);
-                      drupalgap_alert(msg);
-                    }
-                });
-              }
+          );
+          break;
+
+          // Angular
+          case 'ng':
+            angular.forEach(modules_paths, function(module_path, index) {
+                _dg_scope.loadScript(module_path, 'text/javascript', 'utf-8');
+            });
+            break;
+
+          // UNSUPPORTED FRAMEWORK
+          default:
+            console.log(
+              'WARNING: drupalgap_load_modules() - unsupported framework(' +
+                js_framework +
+              ')'
             );
-      });
-    });
+            break;
+        }
+
+      }
+
+    }
     // Now invoke hook_install on all modules, including core.
-    module_invoke_all('install');
+    //module_invoke_all('install');
   }
   catch (error) { console.log('drupalgap_load_modules - ' + error); }
 }
@@ -365,51 +426,47 @@ function drupalgap_load_theme() {
       drupalgap_alert(msg);
     }
     else {
+      
       // Pull the theme name from the settings.js file.
       var theme_name = drupalgap.settings.theme;
       var theme_path = 'themes/' + theme_name + '/' + theme_name + '.js';
-      if (theme_name != 'easystreet3' && theme_name != 'ava') {
-        theme_path = 'app/themes/' + theme_name + '/' + theme_name + '.js';
-      }
-      if (!drupalgap_file_exists(theme_path)) {
-        var error_msg = 'drupalgap_theme_load - Failed to load theme! ' +
-          'The theme\'s JS file does not exist: ' + theme_path;
-        drupalgap_alert(error_msg);
-        return false;
-      }
-      // We found the theme's js file, add it to the page.
-      drupalgap_add_js(theme_path);
+      if (
+        theme_name != 'easystreet3' &&
+        theme_name != 'ava' &&
+        theme_name != 'spi'
+      ) { theme_path = 'app/themes/' + theme_name + '/' + theme_name + '.js'; }
+      
       // Call the theme's template_info implementation.
       var template_info_function = theme_name + '_info';
-      if (drupalgap_function_exists(template_info_function)) {
-        var fn = window[template_info_function];
-        drupalgap.theme = fn();
-        // For each region in the name, set the 'name' value on the region JSON.
-        $.each(drupalgap.theme.regions, function(name, region) {
-            drupalgap.theme.regions[name].name = name;
-        });
-        // Make sure the theme implements the required regions.
-        var regions = system_regions_list();
-        for (var i = 0; i < regions.length; i++) {
-          var region = regions[i];
-          if (typeof drupalgap.theme.regions[region] === 'undefined') {
-            console.log('WARNING: drupalgap_load_theme() - The "' +
-                        theme_name + '" theme does not have the "' + region +
-                        '" region specified in "' + theme_name + '_info()."');
-          }
-        }
-        // Theme loaded successfully! Set the drupalgap.theme_path and return
-        // true.
-        drupalgap.theme_path = theme_path.replace('/' + theme_name + '.js', '');
-        return true;
-      }
-      else {
+      if (!drupalgap_function_exists(template_info_function)) {
         var error_msg = 'drupalgap_load_theme() - failed - ' +
           template_info_function + '() does not exist!';
         drupalgap_alert(error_msg);
+        return false;
       }
+      var fn = window[template_info_function];
+      drupalgap.theme = fn();
+      // For each region in the name, set the 'name' value on the region JSON.
+      for (var name in drupalgap.theme.regions) {
+         if(!drupalgap.theme.regions.hasOwnProperty(name)) { continue; }
+         drupalgap.theme.regions[name].name = name;
+      }
+      // Make sure the theme implements the required regions.
+      var regions = system_regions_list();
+      for (var i = 0; i < regions.length; i++) {
+        var region = regions[i];
+        if (typeof drupalgap.theme.regions[region] === 'undefined') {
+          console.log('WARNING: drupalgap_load_theme() - The "' +
+                      theme_name + '" theme does not have the "' + region +
+                      '" region specified in "' + theme_name + '_info()."');
+        }
+      }
+      // Theme loaded successfully! Set the drupalgap.theme_path and return
+      // true.
+      drupalgap.theme_path = theme_path.replace('/' + theme_name + '.js', '');
     }
-    return false;
+    
+    return true;
   }
   catch (error) { console.log('drupalgap_load_theme - ' + error); }
 }
@@ -422,6 +479,10 @@ function drupalgap_add_js() {
   try {
     var data;
     if (arguments[0]) { data = arguments[0]; }
+    if (_dg_scope) {
+      _dg_scope.loadScript(data, 'text/javascript', 'utf-8');
+      return;
+    }
     jQuery.ajax({
       async: false,
       type: 'GET',
@@ -654,6 +715,11 @@ function drupalgap_empty(value) {
  */
 function drupalgap_file_exists(path) {
   try {
+    var http = new XMLHttpRequest();
+    http.open('HEAD', path, false);
+    http.send();
+    return http.status!=404;
+    // @deprecated
     var file_exists = false;
     jQuery.ajax({
       async: false,
@@ -1043,7 +1109,7 @@ function drupalgap_loading_message_show() {
     //$.mobile.loading('show', options);
     //drupalgap.loading = true;
     setTimeout(function() {
-        $.mobile.loading('show', options);
+        if (drupalgap_is_jqm()) { $.mobile.loading('show', options); }
         drupalgap.loading = true;
     }, 1);
   }
@@ -1059,7 +1125,7 @@ function drupalgap_loading_message_hide() {
     drupalgap.loading = false;
     drupalgap.loader = 'loading';*/
     setTimeout(function() {
-        $.mobile.loading('hide');
+        if (drupalgap_is_jqm()) { $.mobile.loading('hide'); }
         drupalgap.loading = false;
         drupalgap.loader = 'loading';
     }, 100);
@@ -1472,20 +1538,59 @@ function drupalgap_settings_load() {
 function drupalgap_theme_registry_build() {
   try {
     var modules = module_implements('theme');
-    $.each(modules, function(index, module) {
-        var function_name = module + '_theme';
-        var fn = window[function_name];
-        var hook_theme = fn();
-        $.each(hook_theme, function(element, variables) {
-            variables.path = drupalgap_get_path(
-              'theme',
-              drupalgap.settings.theme
-            );
-            drupalgap.theme_registry[element] = variables;
-        });
-    });
+    for (var index in modules) {
+      if (!modules.hasOwnProperty(index)) { continue; }
+      var module = modules[index];
+      var function_name = module + '_theme';
+      var fn = window[function_name];
+      var hook_theme = fn();
+      for (var element in hook_theme) {
+        if (!hook_theme.hasOwnProperty(element)) { continue; }
+        var variables = hook_theme[element];
+        variables.path = drupalgap_get_path(
+          'theme',
+          drupalgap.settings.theme
+        );
+        drupalgap.theme_registry[element] = variables;
+      }
+    }
   }
   catch (error) { console.log('drupalgap_theme_registry_build - ' + error); }
+}
+
+/**
+ * Returns 'jqm' if DrupalGap is using jQuery Mobile, otherwise it returns 'ng'
+ * if DrupalGap is using Angular.
+ * return {Boolean}
+ */
+function drupalgap_js_framework() {
+  try {
+    return typeof drupalgap.settings.js_framework !== 'undefined' ?
+      drupalgap.settings.js_framework : 'jqm';
+  }
+  catch (error) { console.log('drupalgap_js_framework - ' + error); }
+}
+
+/**
+ * Returns true if DrupalGap is using jQuery Mobile, false otherwise.
+ */
+function drupalgap_is_jqm() {
+  try {
+    return drupalgap_js_framework() == 'jqm';
+  }
+  catch (error) { console.log('drupalgap_is_jqm - ' + error); }
+}
+
+/**
+ * Returns true if the it is a web app running jQuery Mobile, false otherwise.
+ * return {Boolean}
+ */
+function drupalgap_is_jqm_web_app() {
+  try {
+    return drupalgap.settings.mode == 'web-app' &&
+      drupalgap_js_framework() == 'jqm';
+  }
+  catch (error) { console.log('drupalgap_is_jqm_web_app - ' + error); }
 }
 
 /**
