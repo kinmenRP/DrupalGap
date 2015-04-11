@@ -48,6 +48,11 @@ Drupal.settings.cache.views.expiration = 3600;
 //  'phonegap' - use this mode to build a mobile application with phonegap
 drupalgap.settings.mode = 'web-app';
 
+// DrupalGap JavaScript Framework (defaults to 'jqm')
+//  'jqm' - use jQuery and jQuery Mobile
+//  'ng' - use Angular JS
+drupalgap.settings.js_framework = 'ng';
+
 /*************|
  * Appearance |
  *************/
@@ -59,7 +64,7 @@ drupalgap.settings.title = 'DrupalGap';
 drupalgap.settings.front = 'dashboard';
 
 // Theme
-drupalgap.settings.theme = 'easystreet3';
+drupalgap.settings.theme = 'spi';
 
 // Logo
 drupalgap.settings.logo = 'themes/easystreet3/images/drupalgap.jpg';
