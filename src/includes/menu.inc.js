@@ -102,7 +102,7 @@ function menu_execute_active_handler() {
       }
 
       // Add a pageshow handler for the page title.
-      if (typeof content === 'object') {
+      if (drupalgap_is_jqm() && typeof content === 'object') {
         var options = {
           'page_id': page_id,
           'jqm_page_event': 'pageshow',
@@ -185,9 +185,11 @@ function menu_list_system_menus() {
       }
     };
     // Add the menu_name to each menu as a property.
-    $.each(system_menus, function(menu_name, menu) {
-        menu.menu_name = menu_name;
-    });
+    for (var menu_name in system_menus) {
+      if (!system_menus.hasOwnProperty(menu_name)) { continue; }
+      var menu = system_menus[menu_name];
+      menu.menu_name = menu_name;
+    }
     return system_menus;
   }
   catch (error) { console.log('menu_list_system_menus - ' + error); }
@@ -206,41 +208,45 @@ function menu_router_build() {
     var function_name;
     var fn;
     var menu_links;
-    $.each(modules, function(index, module) {
-        // Determine the hook function name, grab the function, and call it
-        // to retrieve the hook's menu links.
-        function_name = module + '_menu';
-        fn = window[function_name];
-        menu_links = fn();
-        // Iterate over each item.
-        $.each(menu_links, function(path, menu_item) {
-            // Attach module name to item.
-            menu_item.module = module;
-            // Set a default type for the item if one isn't provided.
-            if (typeof menu_item.type === 'undefined') {
-              menu_item.type = 'MENU_NORMAL_ITEM';
-            }
-            // Set default options and attributes if none have been provided.
-            // @TODO - Now that we are doing this here, there may be a few
-            // places throughout the code that were checking for these
-            // undefined objects that will no longer need to be checked.
-            if (typeof menu_item.options === 'undefined') {
-              menu_item.options = menu_item_default_options();
-            }
-            else if (typeof menu_item.options.attributes === 'undefined') {
-              menu_item.options.attributes = menu_item_default_attributes();
-            }
-            // Make the path available as a property in the menu link.
-            menu_item.path = path;
-            // Determine any parent, sibling, and child paths for the item.
-            drupalgap_menu_router_build_menu_item_relationships(
-              path,
-              menu_item
-            );
-            // Attach item to menu links.
-            drupalgap.menu_links[path] = menu_item;
-        });
-    });
+    for (var index in modules) {
+      if (!modules.hasOwnProperty(index)) { continue; }
+      var module = modules[index];
+      // Determine the hook function name, grab the function, and call it
+      // to retrieve the hook's menu links.
+      function_name = module + '_menu';
+      fn = window[function_name];
+      menu_links = fn();
+      // Iterate over each item.
+      for (var path in menu_links) {
+        if (!menu_links.hasOwnProperty(path)) { continue; }
+        var menu_item = menu_links[path];
+        // Attach module name to item.
+        menu_item.module = module;
+        // Set a default type for the item if one isn't provided.
+        if (typeof menu_item.type === 'undefined') {
+          menu_item.type = 'MENU_NORMAL_ITEM';
+        }
+        // Set default options and attributes if none have been provided.
+        // @TODO - Now that we are doing this here, there may be a few
+        // places throughout the code that were checking for these
+        // undefined objects that will no longer need to be checked.
+        if (typeof menu_item.options === 'undefined') {
+          menu_item.options = menu_item_default_options();
+        }
+        else if (typeof menu_item.options.attributes === 'undefined') {
+          menu_item.options.attributes = menu_item_default_attributes();
+        }
+        // Make the path available as a property in the menu link.
+        menu_item.path = path;
+        // Determine any parent, sibling, and child paths for the item.
+        drupalgap_menu_router_build_menu_item_relationships(
+          path,
+          menu_item
+        );
+        // Attach item to menu links.
+        drupalgap.menu_links[path] = menu_item;
+      }
+    }
   }
   catch (error) { console.log('menu_router_build - ' + error); }
 }
@@ -380,92 +386,99 @@ function drupalgap_menus_load() {
   try {
     if (drupalgap.settings.menus) {
       // Process each menu defined in the settings.
-      $.each(drupalgap.settings.menus, function(menu_name, menu) {
-          // If the menu does not already exist, it is a custom menu, so create
-          // the menu and its corresponding block.
-          if (!drupalgap.menus[menu_name]) {
-            // If the custom menu doesn't have its machine name set, set it.
-            if (!menu.menu_name) { menu.menu_name = menu_name; }
-            // Save the custom menu, as long is its name isn't 'regions',
-            // because that is a special "system" menu that allows menu links to
-            // be placed directly in regions via settings.js. Keep in mind the
-            // 'regions' menu is in fact NOT a system menu.
-            if (menu_name != 'regions') {
-              menu_save(menu);
-              // Make a block for this custom menu.
-              var block_delta = menu.menu_name;
-              drupalgap.blocks[0][block_delta] = {
-                name: block_delta,
-                delta: block_delta,
-                module: 'menu'
-              };
-            }
+      for (var menu_name in drupalgap.settings.menus) {
+        if (!drupalgap.settings.menus.hasOwnProperty(menu_name)) { continue; }
+        var menu = drupalgap.settings.menus[menu_name];
+        // If the menu does not already exist, it is a custom menu, so create
+        // the menu and its corresponding block.
+        if (!drupalgap.menus[menu_name]) {
+          // If the custom menu doesn't have its machine name set, set it.
+          if (!menu.menu_name) { menu.menu_name = menu_name; }
+          // Save the custom menu, as long is its name isn't 'regions',
+          // because that is a special "system" menu that allows menu links to
+          // be placed directly in regions via settings.js. Keep in mind the
+          // 'regions' menu is in fact NOT a system menu.
+          if (menu_name != 'regions') {
+            menu_save(menu);
+            // Make a block for this custom menu.
+            var block_delta = menu.menu_name;
+            drupalgap.blocks[0][block_delta] = {
+              name: block_delta,
+              delta: block_delta,
+              module: 'menu'
+            };
           }
-          else {
-            // The menu is a system defined menu, merge it together with any
-            // custom settings.
-            $.extend(true, drupalgap.menus[menu_name], menu);
-          }
-      });
+        }
+        else {
+          // The menu is a system defined menu, merge it together with any
+          // custom settings.
+          $.extend(true, drupalgap.menus[menu_name], menu);
+        }
+      }
       // Now that we have all of the menus loaded up, and the menu router is
       // built, let's iterate over all the menu links and perform various
       // operations on them.
-      $.each(drupalgap.menu_links, function(path, menu_link) {
-          // Let's grab any links from the router that have a menu specified,
-          // and add the link to the router.
-          if (menu_link.menu_name) {
-            if (drupalgap.menus[menu_link.menu_name]) {
-              // Create a links array for the menu if one doesn't exist already.
-              if (!drupalgap.menus[menu_link.menu_name].links) {
-                drupalgap.menus[menu_link.menu_name].links = [];
-              }
-              // Add the path to the menu link inside the menu.
-              menu_link.path = path;
-              // Now push the link onto the menu. We only care about the title,
-              // path and options, as this is just a link. The rest of the
-              // menu link data can be retrieved from drupalgap.menu_links.
-              var link =
-                drupalgap_menus_load_convert_menu_link_to_link_json(menu_link);
-              drupalgap.menus[menu_link.menu_name].links.push(link);
+      for (var path in drupalgap.menu_links) {
+        if (!drupalgap.menu_links.hasOwnProperty(path)) { continue; }
+        var menu_link = drupalgap.menu_links[path];
+        // Let's grab any links from the router that have a menu specified,
+        // and add the link to the router.
+        if (menu_link.menu_name) {
+          if (drupalgap.menus[menu_link.menu_name]) {
+            // Create a links array for the menu if one doesn't exist already.
+            if (!drupalgap.menus[menu_link.menu_name].links) {
+              drupalgap.menus[menu_link.menu_name].links = [];
             }
-            else {
-              console.log(
-                'drupalgap_menus_load - menu does not exist (' +
-                menu_link.menu_name + '), cannot attach link to it (' +
-                path + ')'
-              );
-            }
+            // Add the path to the menu link inside the menu.
+            menu_link.path = path;
+            // Now push the link onto the menu. We only care about the title,
+            // path and options, as this is just a link. The rest of the
+            // menu link data can be retrieved from drupalgap.menu_links.
+            var link =
+              drupalgap_menus_load_convert_menu_link_to_link_json(menu_link);
+            drupalgap.menus[menu_link.menu_name].links.push(link);
           }
-          // If the menu link is set to a specific region, create a links array
-          // for the region if one doesn't exist already, then add the menu item
-          // to the links array as a link.
-          if (menu_link.region) {
-            if (!drupalgap.theme.regions[menu_link.region.name].links) {
-              drupalgap.theme.regions[menu_link.region.name].links = [];
-            }
-            drupalgap.theme.regions[menu_link.region.name].links.push(
-              menu_link
+          else {
+            console.log(
+              'drupalgap_menus_load - menu does not exist (' +
+              menu_link.menu_name + '), cannot attach link to it (' +
+              path + ')'
             );
           }
-      });
+        }
+        // If the menu link is set to a specific region, create a links array
+        // for the region if one doesn't exist already, then add the menu item
+        // to the links array as a link.
+        if (menu_link.region) {
+          if (!drupalgap.theme.regions[menu_link.region.name].links) {
+            drupalgap.theme.regions[menu_link.region.name].links = [];
+          }
+          drupalgap.theme.regions[menu_link.region.name].links.push(
+            menu_link
+          );
+        }
+      }
       // If there are any region menu links defined in settings.js, create a
       // links array for the region if one doesn't exist already, then add the
       // menu item to the links array as a link.
       if (typeof drupalgap.settings.menus.regions !== 'undefined') {
-        $.each(drupalgap.settings.menus.regions, function(region, menu) {
-            if (
-              typeof menu.links !== 'undefined' &&
-              $.isArray(menu.links) &&
-              menu.links.length > 0
-            ) {
-              if (!drupalgap.theme.regions[region].links) {
-                drupalgap.theme.regions[region].links = [];
-              }
-              $.each(menu.links, function(index, link) {
-                  drupalgap.theme.regions[region].links.push(link);
-              });
+        for (var region in drupalgap.settings.menus.regions) {
+          if (!drupalgap.settings.menus.regions.hasOwnProperty(region)) { continue; }
+          var menu = drupalgap.settings.menus.regions[region];
+          if (
+            typeof menu.links !== 'undefined' &&
+            Array.isArray(menu.links) && menu.links.length > 0
+          ) {
+            if (!drupalgap.theme.regions[region].links) {
+              drupalgap.theme.regions[region].links = [];
             }
-        });
+            for (var index in menu.links) {
+              if (!menu.links.hasOwnProperty(index)) { continue; }
+              var link = menu.links[index];
+              drupalgap.theme.regions[region].links.push(link);
+            }
+          }
+        }
       }
     }
   }
@@ -538,22 +551,28 @@ function drupalgap_menu_router_build_menu_item_relationships(path, menu_item) {
         if (typeof menu_item.siblings === 'undefined') {
           menu_item.siblings = [];
         }
-        $.each(drupalgap.menu_links[parent].children, function(index, sibling) {
-            if (sibling != path && drupalgap.menu_links[sibling]) {
-              if (
-                typeof drupalgap.menu_links[sibling].siblings === 'undefined'
-              ) {
-                drupalgap.menu_links[sibling].siblings = [];
-              }
-              drupalgap.menu_links[sibling].siblings.push(path);
-              menu_item.siblings.push(sibling);
+        for (var index in drupalgap.menu_links[parent].children) {
+          if (!drupalgap.menu_links[parent].children.hasOwnProperty(index)) {
+            continue;
+          }
+          var sibling = drupalgap.menu_links[parent].children[index];
+          if (sibling != path && drupalgap.menu_links[sibling]) {
+            if (
+              typeof drupalgap.menu_links[sibling].siblings === 'undefined'
+            ) {
+              drupalgap.menu_links[sibling].siblings = [];
             }
-        });
+            drupalgap.menu_links[sibling].siblings.push(path);
+            menu_item.siblings.push(sibling);
+          }
+        }
       }
     }
   }
   catch (error) {
-    console.log('drupalgap_menu_router_build_relationships - ' + error);
+    console.log(
+      'drupalgap_menu_router_build_menu_item_relationships - ' + error
+    );
   }
 }
 
