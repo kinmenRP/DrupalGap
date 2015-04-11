@@ -456,3 +456,59 @@ function drupalgap_render_page() {
   catch (error) { console.log('drupalgap_render_page - ' + error); }
 }
 
+if (typeof jQuery !== 'undefined') {
+
+  // In jqm web-app mode, clicking the back button on your browser (or Android
+  // device browser), the drupalgap path doesn't get updated for some
+  // reason(s), so we'll update it manually.
+  if (drupalgap_is_jqm_web_app()) {
+    jQuery(window).on("navigate", function (event, data) {
+          var direction = data.state.direction; // back or forward
+          if (direction == 'back' && drupalgap.back_path.length > 0) {
+            drupalgap.path = drupalgap.back_path[drupalgap.back_path.length - 1];
+          }
+      });
+  }
+  /**
+   * Each time we use drupalgap_goto to change a page, this function is called on
+   * the pagebeforehange event. If we're not moving backwards, or navigating to
+   * the same page, this will preproccesses the page, then processes it.
+   */
+  if (drupalgap_is_jqm()) {
+    jQuery(document).on('pagebeforechange', function(e, data) {
+        try {
+          // If we're moving backwards, reset drupalgap.back and return.
+          if (drupalgap && drupalgap.back) {
+            drupalgap.back = false;
+            return;
+          }
+          // If the jqm active page url is the same as the page id of the current
+          // path, return.
+          if (
+            drupalgap_jqm_active_page_url() ==
+            drupalgap_get_page_id(drupalgap_path_get())
+          ) { return; }
+          // We only want to process the page we are going to, not the page we are
+          // coming from. When data.toPage is a string that is our destination page.
+          if (typeof data.toPage === 'string') {
+    
+            // If drupalgap_goto() determined that it is necessary to prevent the
+            // default page from reloading, then we'll skip the page
+            // processing and reset the prevention boolean.
+            if (drupalgap && !drupalgap.page.process) {
+              drupalgap.page.process = true;
+            }
+            else if (drupalgap) {
+              // Pre process, then process the page.
+              template_preprocess_page(drupalgap.page.variables);
+              template_process_page(drupalgap.page.variables);
+            }
+    
+          }
+        }
+        catch (error) { console.log('pagebeforechange - ' + error); }
+    });
+  }
+
+}
+
