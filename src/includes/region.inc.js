@@ -49,17 +49,19 @@ function drupalgap_render_region(region) {
         // This will allow us to properly wrap region links in a control group.
         var ui_btn_left_count = 0;
         var ui_btn_right_count = 0;
-        $.each(region.links, function(index, link) {
-            var data = menu_region_link_get_data(link);
-            if (!drupalgap_check_visibility('region', data)) { return; }
-            region_link_count++;
-            var css_class = drupalgap_link_get_class(link);
-            if (css_class) {
-              var side = menu_region_link_get_side(css_class);
-              if (side == 'left') { ui_btn_left_count++; }
-              else if (side == 'right') { ui_btn_right_count++; }
-            }
-        });
+        for (var index in region.links) {
+          if (!region.links.hasOwnProperty(index)) { continue; }
+          var link = region.links[index];
+          var data = menu_region_link_get_data(link);
+          if (!drupalgap_check_visibility('region', data)) { return; }
+          region_link_count++;
+          var css_class = drupalgap_link_get_class(link);
+          if (css_class) {
+            var side = menu_region_link_get_side(css_class);
+            if (side == 'left') { ui_btn_left_count++; }
+            else if (side == 'right') { ui_btn_right_count++; }
+          }
+        }
 
         // We need to separately render each side of the header (left, right).
         // That allows us to properly wrap the links with a control group if
@@ -178,22 +180,19 @@ function drupalgap_render_region(region) {
         block_count: 0,
         block_menu_count: 0
       };
-      $.each(drupalgap.settings.blocks[drupalgap.settings.theme][region.name],
-        function(block_delta, block_settings) {
-
-          // Ignore region _prefix and _suffix.
-          if (block_delta == '_prefix' || block_delta == '_suffix') { return; }
-
-          // Render the block.
-          region_html += drupalgap_block_render(
-            region,
-            current_path,
-            block_delta,
-            block_settings,
-            block_counts
-          );
-
-      });
+      for (var block_delta in drupalgap.settings.blocks[drupalgap.settings.theme][region.name]) {
+        if (!drupalgap.settings.blocks[drupalgap.settings.theme][region.name].hasOwnProperty(block_delta)) { continue; }
+        var block_settings = drupalgap.settings.blocks[drupalgap.settings.theme][region.name][block_delta];
+        // Ignore region _prefix and _suffix, then render the block.
+        if (block_delta == '_prefix' || block_delta == '_suffix') { return; }
+        region_html += drupalgap_block_render(
+          region,
+          current_path,
+          block_delta,
+          block_settings,
+          block_counts
+        );
+      }
 
       // If this was a header or footer, and there were only region links
       // rendered, place an empty header in the region.
