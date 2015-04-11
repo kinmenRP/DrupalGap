@@ -102,7 +102,10 @@ function drupalgap_goto(path) {
     // id.
     // @todo - this boolean doesn't match the comment description of the code
     // block, i.e. the form_submission check is opposite of what it says
-    if (drupalgap_jqm_active_page_url() == page_id && options.form_submission) {
+    if (
+      (drupalgap_is_jqm() && drupalgap_jqm_active_page_url() == page_id) &&
+      options.form_submission
+    ) {
       // Clear any messages from the page before returning.
       drupalgap_clear_messages();
       return false;
@@ -186,61 +189,63 @@ function drupalgap_goto(path) {
 function drupalgap_goto_generate_page_and_go(
   path, page_id, options, menu_link) {
   try {
-    var page_template_path = path_to_theme() + '/page.tpl.html';
-    if (!drupalgap_file_exists(page_template_path)) {
-      console.log(
-        'drupalgap_goto_generate_page_and_go - ' +
-        'page template does not exist! (' + page_template_path + ')'
-      );
-    }
-    else {
 
-      // If options wasn't set, set it as an empty JSON object.
-      if (typeof options === 'undefined') { options = {}; }
+    // If options wasn't set, set it as an empty JSON object.
+    if (typeof options === 'undefined') { options = {}; }
+    
+    // JQM
 
-      // Load the page template html file. Determine if we are going to cache
-      // the template file or not.
+    // Load the page template html file. Determine if we are going to cache
+    // the template file or not.
+    if (drupalgap_is_jqm()) {
+      var page_template_path = path_to_theme() + '/page.tpl.html';
       var file_options = {};
       if (drupalgap.settings.cache &&
           drupalgap.settings.cache.theme_registry !== 'undefined' &&
           !drupalgap.settings.cache.theme_registry) {
           file_options.cache = false;
-       }
+      }
       var html = drupalgap_file_get_contents(page_template_path, file_options);
-
-      if (html) {
-
-        // Add page to DOM.
-        drupalgap_add_page_to_dom({
-            page_id: page_id,
-            html: html,
-            menu_link: menu_link
-        });
-
-        // Setup change page options if necessary.
-        if (drupalgap_path_get() == path && options.form_submission) {
-          options.allowSamePageTransition = true;
-        }
-
-        // Let's change to the page. Web apps and the ripple emulator do not
-        // seem to like the 'index.html' prefix, so we'll remove that.
-        var destination = 'index.html#' + page_id;
-        if (
-          drupalgap.settings.mode != 'phonegap' ||
-          typeof parent.window.ripple === 'function'
-        ) { destination = '#' + page_id; }
-        $.mobile.changePage(destination, options);
-
-        // Invoke all implementations of hook_drupalgap_goto_post_process().
-        module_invoke_all('drupalgap_goto_post_process', path);
+  
+      // Add page to DOM.
+      drupalgap_add_page_to_dom({
+          page_id: page_id,
+          html: html,
+          menu_link: menu_link
+      });
+  
+      // Setup change page options if necessary.
+      if (drupalgap_path_get() == path && options.form_submission) {
+        options.allowSamePageTransition = true;
       }
-      else {
-        drupalgap_alert(
-          'drupalgap_goto_generate_page_and_go - ' +
-          'failed to load theme\'s page.tpl.html file'
-        );
-      }
+  
+      // Let's change to the page. Web apps and the ripple emulator do not
+      // seem to like the 'index.html' prefix, so we'll remove that.
+      var destination = 'index.html#' + page_id;
+      if (
+        drupalgap.settings.mode != 'phonegap' ||
+        typeof parent.window.ripple === 'function'
+      ) { destination = '#' + page_id; }
+      $.mobile.changePage(destination, options);
+      
+      // @see the pagebeforechange handler for what is executed next...
+      
     }
+    else {
+      // ANGULAR
+      _dg_scope.$apply(function() {
+          _dg_scope.drupalgap_page_attributes = drupalgap_attributes(
+            drupalgap_prepare_page_attributes(options, menu_link)
+          );
+      });
+      template_preprocess_page(drupalgap.page.variables);
+      template_process_page(drupalgap.page.variables);
+      drupalgap.pages.push(options.page_id);
+    }
+
+    // Invoke all implementations of hook_drupalgap_goto_post_process().
+    module_invoke_all('drupalgap_goto_post_process', path);
+
   }
   catch (error) {
     console.log('drupalgap_goto_generate_page_and_go - ' + error);
@@ -356,16 +361,3 @@ function _drupalgap_back_exit(button) {
   catch (error) { console.log('_drupalgap_back_exit - ' + error); }
 }
 
-$(window).on("navigate", function (event, data) {
-
-    // In web-app mode, clicking the back button on your browser (or Android
-    // device browser), the drupalgap path doesn't get updated for some
-    // reason(s), so we'll update it manually.
-    if (drupalgap.settings.mode == 'web-app') {
-      var direction = data.state.direction; // back or forward
-      if (direction == 'back' && drupalgap.back_path.length > 0) {
-        drupalgap.path = drupalgap.back_path[drupalgap.back_path.length - 1];
-      }
-    }
-
-});
