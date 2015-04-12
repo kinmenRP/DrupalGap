@@ -13,12 +13,14 @@ function user_access(string) {
     else { account = Drupal.user; }
     if (account.uid == 1) { return true; }
     var access = false;
-    $.each(account.permissions, function(index, object) {
-        if (object.permission == string) {
-          access = true;
-          return false;
-        }
-    });
+    for (var index in account.permissions) {
+      if (!account.permissions.hasOwnProperty(index)) { continue; }
+      var object = account.permissions[index];
+      if (object.permission == string) {
+        access = true;
+        break;
+      }
+    }
     return access;
   }
   catch (error) { console.log('user_access - ' + error); }
@@ -344,12 +346,14 @@ function drupalgap_user_has_role(role) {
     var account = null;
     if (arguments[1]) { account = arguments[1]; }
     else { account = Drupal.user; }
-    $.each(account.roles, function(rid, value) {
-        if (role == value) {
-          has_role = true;
-          return false;
-        }
-    });
+    for (var rid in account.roles) {
+      if (!account.roles.hasOwnProperty(rid)) { continue; }
+      var value = account.roles[rid];
+      if (role == value) {
+        has_role = true;
+        break;
+      }
+    }
     return has_role;
   }
   catch (error) { console.log('drupalgap_user_has_role - ' + error); }
