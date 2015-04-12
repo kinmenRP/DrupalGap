@@ -35,6 +35,17 @@ function menu_block_view(delta, region) {
       menu.options.wrap_options.attributes
     ) { container_attributes = menu.options.wrap_options.attributes; }
     container_attributes.id = container_id;
+    
+    // For angular we'll just fake the pageshow.
+    if (!drupalgap_is_jqm()) {
+      return menu_block_view_pageshow({
+          menu_name: delta,
+          container_id: container_id,
+          'data-role': data_role
+      });
+    }
+    
+    // jQM, continue as usual...
     return '<div ' + drupalgap_attributes(container_attributes) + '></div>' +
       drupalgap_jqm_page_event_script_code({
           page_id: drupalgap_get_page_id(),
@@ -261,22 +272,26 @@ function menu_block_view_pageshow(options) {
       if (drupalgap.menus[delta] && drupalgap.menus[delta].links) {
         menu = drupalgap.menus[delta];
         var items = [];
-        $.each(menu.links, function(index, menu_link) {
-            // Make a deep copy of the menu link so we don't modify it.
-            var link = jQuery.extend(true, {}, menu_link);
-            // If there are no link options, set up defaults.
-            if (!link.options) { link.options = {attributes: {}}; }
-            else if (!link.options.attributes) { link.options.attributes = {}; }
-            // If the link points to the current path, set it as active.
-            if (link.path == path) {
-              if (!link.options.attributes['class']) {
-                link.options.attributes['class'] = '';
-              }
-              link.options.attributes['class'] +=
-                ' ui-btn ui-btn-active ui-state-persist ';
+        for (var index in menu.links) {
+          if (!menu.links.hasOwnProperty(index)) { continue; }
+          var menu_link = menu.links[index];
+          // Make a deep copy of the menu link so we don't modify it.
+          var link = drupalgap_is_jqm() ?
+            jQuery.extend(true, {}, menu_link) :
+            angular.extend({}, {}, menu_link);
+          // If there are no link options, set up defaults.
+          if (!link.options) { link.options = {attributes: {}}; }
+          else if (!link.options.attributes) { link.options.attributes = {}; }
+          // If the link points to the current path, set it as active.
+          if (link.path == path) {
+            if (!link.options.attributes['class']) {
+              link.options.attributes['class'] = '';
             }
-            items.push(l(link.title, link.path, link.options));
-        });
+            link.options.attributes['class'] +=
+              ' ui-btn ui-btn-active ui-state-persist ';
+          }
+          items.push(l(link.title, link.path, link.options));
+        }
         if (items.length > 0) {
           // Pass along any menu attributes.
           var attributes = null;
@@ -286,15 +301,19 @@ function menu_block_view_pageshow(options) {
           html = theme('item_list', {'items': items, 'attributes': attributes});
         }
       }
-      // Inject the html.
-      $('#' + options.container_id).html(html).trigger('create');
-      // Remove the placeholder wrapper, unless we were instructed not to.
-      var wrap = false;
-      if (
-        menu && typeof menu.options !== 'undefined' &&
-        typeof menu.options.wrap !== 'undefined' && menu.options.wrap
-      ) { wrap = true; }
-      if (!wrap) { $('#' + options.container_id).children().unwrap(); }
+      // Inject the html for jQM, or just return it for Angular.
+      if (drupalgap_is_jqm()) {
+        $('#' + options.container_id).html(html).trigger('create');
+        // Remove the placeholder wrapper, unless we were instructed not to.
+        var wrap = false;
+        if (
+          menu && typeof menu.options !== 'undefined' &&
+          typeof menu.options.wrap !== 'undefined' && menu.options.wrap
+        ) { wrap = true; }
+        if (!wrap) { $('#' + options.container_id).children().unwrap(); }
+      }
+      else { return html; }
+      
     }
   }
   catch (error) { console.log('menu_block_view_pageshow - ' + error); }
