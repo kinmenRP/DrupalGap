@@ -721,16 +721,18 @@ function theme_item_list(variables) {
     if (variables.items && variables.items.length > 0) {
       var listview = typeof variables.attributes['data-role'] !== 'undefined' &&
           variables.attributes['data-role'] == 'listview';
-      $.each(variables.items, function(index, item) {
-          var icon;
-          html += '<li';
-          if (listview && (icon = $(item).attr('data-icon'))) {
-            // If we're in a listview and the item specifies an icon,
-            // add the icon attribute to the list item element.
-            html += ' data-icon="' + icon + '"';
-          }
-          html += '>' + item + '</li>';
-      });
+      for (var index in variables.items) {
+        if (!variables.items.hasOwnProperty(index)) { continue; }
+        var item = variables.items[index];
+        var icon;
+        html += '<li';
+        if (listview && (icon = $(item).attr('data-icon'))) {
+          // If we're in a listview and the item specifies an icon,
+          // add the icon attribute to the list item element.
+          html += ' data-icon="' + icon + '"';
+        }
+        html += '>' + item + '</li>';
+      }
     }
     html += '</' + type + '>';
     return html;
@@ -802,11 +804,13 @@ function theme_link(variables) {
           // onclick handler.
 
           var goto_options = '';
-          $.each(variables.options, function(option, value) {
-              if (option == 'attributes') { return; }
-              if (typeof value === 'string') { value = "'" + value + "'"; }
-              goto_options += option + ':' + value + ',';
-          });
+          for (var option in variables.options) {
+            if (!variables.options.hasOwnProperty(option)) { continue; }
+            var value = variables.options[option];
+            if (option == 'attributes') { continue; }
+            if (typeof value === 'string') { value = "'" + value + "'"; }
+            goto_options += option + ':' + value + ',';
+          }
           onclick =
             'drupalgap_goto(\'' +
               variables.path + '\', ' +
