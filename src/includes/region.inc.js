@@ -7,6 +7,9 @@
  */
 function drupalgap_render_region(region) {
   try {
+
+    // @NOTE - template_process_page() is the caller of this function.
+
     // @TODO - this function is getting huge. Break it up into many more
     // manageable functions.
 
@@ -53,7 +56,7 @@ function drupalgap_render_region(region) {
           if (!region.links.hasOwnProperty(index)) { continue; }
           var link = region.links[index];
           var data = menu_region_link_get_data(link);
-          if (!drupalgap_check_visibility('region', data)) { return; }
+          if (!drupalgap_check_visibility('region', data)) { continue; }
           region_link_count++;
           var css_class = drupalgap_link_get_class(link);
           if (css_class) {
@@ -183,8 +186,11 @@ function drupalgap_render_region(region) {
       for (var block_delta in drupalgap.settings.blocks[drupalgap.settings.theme][region.name]) {
         if (!drupalgap.settings.blocks[drupalgap.settings.theme][region.name].hasOwnProperty(block_delta)) { continue; }
         var block_settings = drupalgap.settings.blocks[drupalgap.settings.theme][region.name][block_delta];
+
         // Ignore region _prefix and _suffix, then render the block.
-        if (block_delta == '_prefix' || block_delta == '_suffix') { return; }
+        if (block_delta == '_prefix' || block_delta == '_suffix') { continue; }
+
+        // Render the block.
         region_html += drupalgap_block_render(
           region,
           current_path,
@@ -192,6 +198,7 @@ function drupalgap_render_region(region) {
           block_settings,
           block_counts
         );
+
       }
 
       // If this was a header or footer, and there were only region links
