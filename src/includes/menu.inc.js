@@ -37,15 +37,14 @@ function menu_execute_active_handler() {
         // the url so the entity is sent via the page arguments to the page
         // callback, instead of just sending the integer.
         var args = arg(null, path);
-        $.each(
-          drupalgap.menu_links[router_path].page_arguments,
-          function(index, object) {
-            if (is_int(object) && args[object]) {
-              page_arguments.push(args[object]);
-            }
-            else { page_arguments.push(object); }
+        for (var index in drupalgap.menu_links[router_path].page_arguments) {
+          if (!drupalgap.menu_links[router_path].page_arguments.hasOwnProperty(index)) { continue; }
+          var object = drupalgap.menu_links[router_path].page_arguments[index];
+          if (is_int(object) && args[object]) {
+            page_arguments.push(args[object]);
           }
-        );
+          else { page_arguments.push(object); }
+        }
 
         // Call the page callback function with the page arguments.
         content = fn.apply(null, Array.prototype.slice.call(page_arguments));
