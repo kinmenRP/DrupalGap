@@ -71,7 +71,7 @@ function _GET() {
       // If the id hasn't been instantiated, do so. Then set the key and value
       // onto it.
       if (typeof _dg_GET[id] === 'undefined') { _dg_GET[id] = {}; }
-      if (value) {  _dg_GET[id][key] = value; }
+      if (value) { _dg_GET[id][key] = value; }
 
     }
     return null;
@@ -112,35 +112,47 @@ function template_process_page(variables) {
     // Execute the active menu handler to assemble the page output. We need to
     // do this before we render the regions below.
     drupalgap.output = menu_execute_active_handler();
-    
+
     var jqm = drupalgap_is_jqm();
-    
-    // For each region, render it, then replace the placeholder in the page's
-    // html with the rendered region.
+
+    // Prepare the page id and other vars.
     var page_id = drupalgap_get_page_id(drupalgap_path);
     var page_html = null;
     if (jqm) {
       var page_html = $('#' + page_id).html();
       if (!page_html) { return; }
     }
+
+    // REGIONS
+
+    // Render each region...
     for (var index in drupalgap.theme.regions) {
       if (!drupalgap.theme.regions.hasOwnProperty(index)) { continue; }
       var region = drupalgap.theme.regions[index];
+      dpm(region.name);
+
+      // JQM
       if (jqm) {
+
+        // Render it, then replace the placeholder in the page's html with the
+        // rendered region.
         page_html = page_html.replace(
           '{:' + region.name + ':}',
           drupalgap_render_region(region)
         );
       }
+
+      // ANGULAR
       else {
-        // For Angular, just render the region in the scope.
         page_html = drupalgap_render_region(region);
         _dg_scope.$apply(function() {
             _dg_scope[region.name] = _dg_sce.trustAsHtml(page_html);
         });
       }
+
     }
     if (jqm) { $('#' + page_id).html(page_html); }
+
   }
   catch (error) { console.log('template_process_page - ' + error); }
 }
@@ -176,7 +188,7 @@ function drupalgap_prepare_page_attributes(options, menu_link) {
     }
     else {
       attributes =
-        angular.extend({}, attributes, menu_link.options.attributes)
+        angular.extend({}, attributes, menu_link.options.attributes);
     }
     attributes['class'] +=
       ' ' + drupalgap_page_class_get(drupalgap.router_path);
@@ -291,7 +303,7 @@ function drupalgap_page_class_get(router_path) {
  */
 function drupalgap_page_in_dom(page_id) {
   try {
-    return document.getElementById('my_new_div') ? true: false;
+    return document.getElementById('my_new_div') ? true : false;
     // @deprecated
     var pages = $("body div[data-role$='page']");
     var page_in_dom = false;
@@ -337,7 +349,7 @@ function drupalgap_jqm_active_page_url() {
 
 /**
  * Renders the html string of the page content that is stored in
- * drupalgap.output.
+ * drupalgap.output. This is only used by the "main" system block.
  * @return {String}
  */
 function drupalgap_render_page() {
@@ -462,7 +474,7 @@ if (typeof jQuery !== 'undefined') {
   // device browser), the drupalgap path doesn't get updated for some
   // reason(s), so we'll update it manually.
   if (drupalgap_is_jqm_web_app()) {
-    jQuery(window).on("navigate", function (event, data) {
+    jQuery(window).on('navigate', function(event, data) {
           var direction = data.state.direction; // back or forward
           if (direction == 'back' && drupalgap.back_path.length > 0) {
             drupalgap.path = drupalgap.back_path[drupalgap.back_path.length - 1];
@@ -491,7 +503,7 @@ if (typeof jQuery !== 'undefined') {
           // We only want to process the page we are going to, not the page we are
           // coming from. When data.toPage is a string that is our destination page.
           if (typeof data.toPage === 'string') {
-    
+
             // If drupalgap_goto() determined that it is necessary to prevent the
             // default page from reloading, then we'll skip the page
             // processing and reset the prevention boolean.
@@ -503,7 +515,7 @@ if (typeof jQuery !== 'undefined') {
               template_preprocess_page(drupalgap.page.variables);
               template_process_page(drupalgap.page.variables);
             }
-    
+
           }
         }
         catch (error) { console.log('pagebeforechange - ' + error); }
