@@ -98,9 +98,12 @@ function system_block_view(delta) {
         return '<h1 id="' + title_id + '"></h1>';
         break;
       case 'powered_by':
-        return '<p style="text-align: center;">Powered by: ' +
-          l('DrupalGap', 'http://www.drupalgap.org', {InAppBrowser: true}) +
-        '</p>';
+        return l('DrupalGap', 'http://www.drupalgap.org', {
+            InAppBrowser: true,
+            attributes: {
+              'class': 'navbar-brand'
+            }
+        });
         break;
       case 'help':
         return l('Help', 'http://www.drupalgap.org/support');
@@ -229,22 +232,31 @@ function system_dashboard_page() {
     };
     if (drupalgap.settings.logo) {
       content.logo = {
-        markup: '<center>' +
-                 theme('image', {path: drupalgap.settings.logo}) +
-               '</center>'
+        markup:
+          '<div class="well"><p>' + theme('image', {
+              path: drupalgap.settings.logo,
+              attributes: {
+                'class': 'img-thumbnail img-responsive center-block'
+              }
+          }) + '</p></div>'
       };
     }
-    content.get_started = {
-      theme: 'button_link',
-      text: 'Getting Started Guide',
-      path: 'http://www.drupalgap.org/get-started',
-      options: {InAppBrowser: true}
-    };
-    content.support = {
-      theme: 'button_link',
-      text: 'Support',
-      path: 'http://www.drupalgap.org/support',
-      options: {InAppBrowser: true}
+    content['buttons'] = {
+      markup: '<p style="text-align: center;">' + bl(
+        'Getting Started Guide',
+        'http://www.drupalgap.org/get-started',
+        {
+          InAppBrowser: true,
+          attributes: {
+            'class': ' btn-lg btn-success '
+          }
+        }  
+      ) + '&nbsp;' + bl('Support', 'http://www.drupalgap.org/support', {
+          InAppBrowser: true,
+          attributes: {
+            'class': ' btn-lg btn-info '
+          }
+      }) + '</p>'
     };
     return content;
   }
