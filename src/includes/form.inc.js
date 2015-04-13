@@ -123,6 +123,7 @@ function drupalgap_form_defaults(form_id) {
  */
 function drupalgap_form_render(form) {
   try {
+    
     // @TODO - we may possibly colliding html element ids!!! For example, I
     // think the node edit page gets an id of "node_edit" and possibly so does
     // the node edit form, which also may get an id of "node_edit". We may want
@@ -135,8 +136,10 @@ function drupalgap_form_render(form) {
       return '<p>drupalgap_form_render() - missing form id!</p>' +
         JSON.stringify(form);
     }
-    // If the form already exists in the DOM, remove it.
-    if ($('form#' + form.id).length) { $('form#' + form.id).remove(); }
+    // In jQM, if the form already exists in the DOM, remove it.
+    if (drupalgap_is_jqm() && $('form#' + form.id).length) {
+      $('form#' + form.id).remove();
+    }
     // Render the prefix and suffix and wrap them in their own div.
     var prefix = form.prefix;
     if (!empty(prefix)) {
@@ -225,9 +228,9 @@ function drupalgap_form_load(form_id) {
       // each to to the form arguments, afterwards remove the argument at index
       // zero because that is the form id.
       var form_arguments = [];
-      $.each(arguments, function(index, argument) {
-            form_arguments.push(argument);
-      });
+      for (var index = 0; index < arguments.length; index++) {
+        form_arguments.push(arguments[index]);
+      }
       form_arguments.splice(0, 1);
 
       // Attach the form arguments to the form object.
@@ -244,9 +247,9 @@ function drupalgap_form_load(form_id) {
         var form_state = null;
         consolidated_arguments.push(form);
         consolidated_arguments.push(form_state);
-        $.each(form_arguments, function(index, argument) {
-          consolidated_arguments.push(argument);
-        });
+        for (var index = 0; index < form_arguments.length; index++) {
+          consolidated_arguments.push(form_arguments[index]);
+        }
         form = fn.apply(
           null,
           Array.prototype.slice.call(consolidated_arguments)
@@ -257,75 +260,83 @@ function drupalgap_form_load(form_id) {
       // element does not yet have any. This allows others to more easily modify
       // options and attributes on an element without having to worry about
       // testing for nulls and creating empty properties first.
-      $.each(form.elements, function(name, element) {
-          // If this element is a field, load its field_info_field and
-          // field_info_instance onto the element.
-          var element_is_field = false;
-          var field_info_field = drupalgap_field_info_field(name);
-          if (field_info_field) {
-            element_is_field = true;
-            form.elements[name].field_info_field = field_info_field;
-            form.elements[name].field_info_instance =
-              drupalgap_field_info_instance(
-                form.entity_type,
-                name,
-                form.bundle
-              );
+      for (var name in form.elements) {
+        if (!form.elements.hasOwnProperty(name)) { continue; }
+        var element = form.elements[name];
+        // If this element is a field, load its field_info_field and
+        // field_info_instance onto the element.
+        var element_is_field = false;
+        var field_info_field = drupalgap_field_info_field(name);
+        if (field_info_field) {
+          element_is_field = true;
+          form.elements[name].field_info_field = field_info_field;
+          form.elements[name].field_info_instance =
+            drupalgap_field_info_instance(
+              form.entity_type,
+              name,
+              form.bundle
+            );
+        }
+        form.elements[name].is_field = element_is_field;
+        // Set the name property on the element if it isn't already set.
+        if (!form.elements[name].name) { form.elements[name].name = name; }
+        // If the element is a field, we'll append a language code and delta
+        // value to the element id, along with the field items appended
+        // onto the element using the language code and delta values.
+        var id = null;
+        if (element_is_field) {
+          // What's the number of allowed values (cardinality) on this field?
+          // A cardinality of -1 means the field has unlimited values.
+          var cardinality = parseInt(element.field_info_field.cardinality);
+          if (cardinality == -1) {
+            cardinality = 1; // we'll just add one element for now, until we
+                             // figure out how to handle the 'add another
+                             // item' feature.
           }
-          form.elements[name].is_field = element_is_field;
-          // Set the name property on the element if it isn't already set.
-          if (!form.elements[name].name) { form.elements[name].name = name; }
-          // If the element is a field, we'll append a language code and delta
-          // value to the element id, along with the field items appended
-          // onto the element using the language code and delta values.
-          var id = null;
-          if (element_is_field) {
-            // What's the number of allowed values (cardinality) on this field?
-            // A cardinality of -1 means the field has unlimited values.
-            var cardinality = parseInt(element.field_info_field.cardinality);
-            if (cardinality == -1) {
-              cardinality = 1; // we'll just add one element for now, until we
-                               // figure out how to handle the 'add another
-                               // item' feature.
+          // Initialize the item collections language code if it hasn't been.
+          if (!form.elements[name][language]) {
+            form.elements[name][language] = {};
+          }
+          // Prepare the item(s) for this element.
+          for (var delta = 0; delta < cardinality; delta++) {
+            // Prepare some item defaults.
+            var item = drupalgap_form_element_item_create(
+              name,
+              form,
+              language,
+              delta
+            );
+            // If the delta for this item hasn't been created on the element,
+            // create it using the default item values. Otherwise, merge the
+            // default values into the pre existing item on the element.
+            if (!form.elements[name][language][delta]) {
+              form.elements[name][language][delta] = item;
             }
-            // Initialize the item collections language code if it hasn't been.
-            if (!form.elements[name][language]) {
-              form.elements[name][language] = {};
-            }
-            // Prepare the item(s) for this element.
-            for (var delta = 0; delta < cardinality; delta++) {
-              // Prepare some item defaults.
-              var item = drupalgap_form_element_item_create(
-                name,
-                form,
-                language,
-                delta
-              );
-              // If the delta for this item hasn't been created on the element,
-              // create it using the default item values. Otherwise, merge the
-              // default values into the pre existing item on the element.
-              if (!form.elements[name][language][delta]) {
-                form.elements[name][language][delta] = item;
+            else {
+              if (drupalgap_is_jqm()) {
+                $.extend(true, form.elements[name][language][delta], item);  
               }
               else {
-                $.extend(true, form.elements[name][language][delta], item);
+                // @TODO need recursive extend here!
+                angular.extend(form.elements[name][language][delta], form.elements[name][language][delta], item);
               }
             }
           }
-          else {
-            // This element is not a field, setup default options if none
-            // have been provided. Then set the element id.
-            if (!element.options) {
-              form.elements[name].options = {attributes: {}};
-            }
-            else if (!element.options.attributes) {
-              form.elements[name].options.attributes = {};
-            }
-            id = drupalgap_form_get_element_id(name, form.id);
-            form.elements[name].id = id;
-            form.elements[name].options.attributes.id = id;
+        }
+        else {
+          // This element is not a field, setup default options if none
+          // have been provided. Then set the element id.
+          if (!element.options) {
+            form.elements[name].options = {attributes: {}};
           }
-      });
+          else if (!element.options.attributes) {
+            form.elements[name].options.attributes = {};
+          }
+          id = drupalgap_form_get_element_id(name, form.id);
+          form.elements[name].id = id;
+          form.elements[name].options.attributes.id = id;
+        }
+      }
 
       // Give modules an opportunity to alter the form.
       module_invoke_all('form_alter', form, null, form_id);
