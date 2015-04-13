@@ -97,45 +97,47 @@ function _drupalgap_form_render_elements(form) {
     // set it, then render the element if access is permitted. While rendering
     // the elements, set them aside according to their widget weight so they
     // can be appended to the content string in the correct order later.
-    $.each(form.elements, function(name, element) {
-        if (!element.name) { element.name = name; }
-        if (drupalgap_form_element_access(element)) {
-          if (element.is_field && element.field_info_instance.widget.weight) {
-            content_weighted[element.field_info_instance.widget.weight] =
-              _drupalgap_form_render_element(form, element);
-          }
-          else {
-            // Extract the bundle. Note, on comments the bundle is prefixed with
-            // 'comment_node_' so we need to remove that to correctly map to the
-            // potential extra fields data.
-            var bundle = null;
-            if (form.bundle) {
-              bundle = form.bundle;
-              if (
-                form.entity_type == 'comment' &&
-                form.bundle.indexOf('comment_node_') != -1
-              ) { bundle = form.bundle.replace('comment_node_', ''); }
-            }
-            // This is not a field, if it has a weight in
-            // field_info_extra_fields use it, otherwise just append it to the
-            // content.
-            if (
-              form.entity_type && bundle &&
-              typeof drupalgap.field_info_extra_fields[bundle][name] !==
-                'undefined' &&
-              typeof
-                drupalgap.field_info_extra_fields[bundle][name].weight !==
-                'undefined'
-            ) {
-              var weight =
-                drupalgap.field_info_extra_fields[bundle][name].weight;
-              content_weighted[weight] =
-              _drupalgap_form_render_element(form, element);
-            }
-            else { content += _drupalgap_form_render_element(form, element); }
-          }
+    for (var name in form.elements) {
+      if (!form.elements.hasOwnProperty(name)) { continue; }
+      var element = form.elements[name];
+      if (!element.name) { element.name = name; }
+      if (drupalgap_form_element_access(element)) {
+        if (element.is_field && element.field_info_instance.widget.weight) {
+          content_weighted[element.field_info_instance.widget.weight] =
+            _drupalgap_form_render_element(form, element);
         }
-    });
+        else {
+          // Extract the bundle. Note, on comments the bundle is prefixed with
+          // 'comment_node_' so we need to remove that to correctly map to the
+          // potential extra fields data.
+          var bundle = null;
+          if (form.bundle) {
+            bundle = form.bundle;
+            if (
+              form.entity_type == 'comment' &&
+              form.bundle.indexOf('comment_node_') != -1
+            ) { bundle = form.bundle.replace('comment_node_', ''); }
+          }
+          // This is not a field, if it has a weight in
+          // field_info_extra_fields use it, otherwise just append it to the
+          // content.
+          if (
+            form.entity_type && bundle &&
+            typeof drupalgap.field_info_extra_fields[bundle][name] !==
+              'undefined' &&
+            typeof
+              drupalgap.field_info_extra_fields[bundle][name].weight !==
+              'undefined'
+          ) {
+            var weight =
+              drupalgap.field_info_extra_fields[bundle][name].weight;
+            content_weighted[weight] =
+            _drupalgap_form_render_element(form, element);
+          }
+          else { content += _drupalgap_form_render_element(form, element); }
+        }
+      }
+    }
     // Prepend the weighted elements to the content.
     if (!empty(content_weighted)) {
       for (var weight in content_weighted) {
@@ -147,18 +149,27 @@ function _drupalgap_form_render_elements(form) {
     // Add any form buttons to the form elements html, if access to the button
     // is permitted.
     if (form.buttons && form.buttons.length != 0) {
-      $.each(form.buttons, function(name, button) {
-          if (drupalgap_form_element_access(button)) {
-            var attributes = {
-              type: 'button',
-              id: drupalgap_form_get_element_id(name, form.id)
-            };
-            if (button.attributes) { $.extend(attributes, button.attributes); }
-            content += '<button ' + drupalgap_attributes(attributes) + '">' +
-              button.title +
-            '</button>';
+      for (var name in form.buttons) {
+        if (!form.buttons.hasOwnProperty(name)) { continue; }
+        var button = form.buttons[name];
+        if (drupalgap_form_element_access(button)) {
+          var attributes = {
+            type: 'button',
+            id: drupalgap_form_get_element_id(name, form.id)
+          };
+          if (button.attributes) {
+            if (drupalgap_is_jqm()) {
+              $.extend(attributes, button.attributes);
+            }
+            else {
+              angular.extend(attributes, button.attributes);
+            }
           }
-      });
+          content += '<button ' + drupalgap_attributes(attributes) + '">' +
+            button.title +
+          '</button>';
+        }
+      }
     }
     return content;
   }
@@ -237,96 +248,115 @@ function _drupalgap_form_render_element(form, element) {
     var item_html = '';
     var item_label = '';
     var render_item = null;
-    $.each(items, function(delta, item) {
+    for (var delta in items) {
+      if (!items.hasOwnProperty(delta)) { continue; }
+      var item = items[delta];
 
-        // We'll render the item, unless we prove otherwise.
-        render_item = true;
+      // We'll render the item, unless we prove otherwise.
+      render_item = true;
 
-        // Overwrite the variable's attributes id with the item's id.
-        variables.attributes.id = item.id;
+      // Overwrite the variable's attributes id with the item's id.
+      variables.attributes.id = item.id;
 
-        // Attach the item as the element onto variables.
-        variables.element = item;
+      // Attach the item as the element onto variables.
+      variables.element = item;
 
-        // Create an array for the item's children if it doesn't exist already.
-        // This is used by field widget forms to extend form elements.
-        if (!items[delta].children) { items[delta].children = []; }
+      // Create an array for the item's children if it doesn't exist already.
+      // This is used by field widget forms to extend form elements.
+      if (!items[delta].children) { items[delta].children = []; }
 
-        // Generate the label for field items on delta zero only. Keep in mind
-        // rendered labels, with an element title_placeholder set to true,
-        // will not be appended to the result html later.
-        if (element.is_field && delta == 0) {
-          item.title = element.title;
-          item_label = theme('form_element_label', {'element': item});
-        }
+      // Generate the label for field items on delta zero only. Keep in mind
+      // rendered labels, with an element title_placeholder set to true,
+      // will not be appended to the result html later.
+      if (element.is_field && delta == 0) {
+        item.title = element.title;
+        item_label = theme('form_element_label', {'element': item});
+      }
 
-        // If the element's title is set to be a placeholder, set the
-        // placeholder attribute equal to the title on the current item, unless
-        // someone already set it. If it is a required element, mark it as such.
-        if (
-          delta == 0 && typeof element.title_placeholder !== 'undefined' &&
-          element.title_placeholder &&
-          typeof variables.attributes['placeholder'] === 'undefined'
-        ) {
-          var placeholder = element.title;
-          // @TODO show a better required marker for placeholders.
-          /*if (element.required) {
-            placeholder += ' ' + theme('form_required_marker', { });
-          }*/
-          variables.attributes['placeholder'] = placeholder;
-        }
+      // If the element's title is set to be a placeholder, set the
+      // placeholder attribute equal to the title on the current item, unless
+      // someone already set it. If it is a required element, mark it as such.
+      if (
+        delta == 0 && typeof element.title_placeholder !== 'undefined' &&
+        element.title_placeholder &&
+        typeof variables.attributes['placeholder'] === 'undefined'
+      ) {
+        var placeholder = element.title;
+        // @TODO show a better required marker for placeholders.
+        /*if (element.required) {
+          placeholder += ' ' + theme('form_required_marker', { });
+        }*/
+        variables.attributes['placeholder'] = placeholder;
+      }
 
-        // If there wasn't a default value provided, set one. Then set the
-        // default value into the variables' attributes. Although, if we have an
-        // item value, just use that.
-        if (!item.default_value) { item.default_value = ''; }
-        variables.attributes.value = item.default_value;
-        if (typeof item.value !== 'undefined') {
-          variables.attributes.value = item.value;
-        }
+      // If there wasn't a default value provided, set one. Then set the
+      // default value into the variables' attributes. Although, if we have an
+      // item value, just use that.
+      if (!item.default_value) { item.default_value = ''; }
+      variables.attributes.value = item.default_value;
+      if (typeof item.value !== 'undefined') {
+        variables.attributes.value = item.value;
+      }
 
-        // Call the hook_field_widget_form() if necessary. Merge any changes
-        // to the item back into this item.
-        if (field_widget_form_function) {
-          field_widget_form_function.apply(
-            null, [
-              form,
-              null,
-              element.field_info_field,
-              element.field_info_instance,
-              language,
-              items,
-              delta,
-              element
-          ]);
-          // @TODO - sometimes an item gets merged without a type here, why?
-          // @UPDATE - did the recursive extend fix this?
+      // Call the hook_field_widget_form() if necessary. Merge any changes
+      // to the item back into this item.
+      if (field_widget_form_function) {
+        field_widget_form_function.apply(
+          null, [
+            form,
+            null,
+            element.field_info_field,
+            element.field_info_instance,
+            language,
+            items,
+            delta,
+            element
+        ]);
+        // @TODO - sometimes an item gets merged without a type here, why?
+        // @UPDATE - did the recursive extend fix this?
+        if (drupalgap_is_jqm()) {
           item = $.extend(true, item, items[delta]);
-          // If the item type got lost, replace it.
-          if (!item.type && element.type) { item.type = element.type; }
         }
+        else {
+          // @TODO we need recursive merging here!
+          item = angular.extend({}, item, items[delta]);
+        }
+        // If the item type got lost, replace it.
+        if (!item.type && element.type) { item.type = element.type; }
+      }
 
-        // Merge element attributes into the variables object.
-        if (item.options && item.options.attributes) {
+      // Merge element attributes into the variables object.
+      if (item.options && item.options.attributes) {
+        if (drupalgap_is_jqm()) {
           variables.attributes = $.extend(
             true,
             variables.attributes,
             item.options.attributes
+          );  
+        }
+        else {
+          // @TODO we need recursive merging here!
+          variables.attributes = angular.extend(
+            {},
+            variables.attributes,
+            item.options.attributes
           );
         }
+      }
 
-        // Render the element item, unless it wasn't supported.
-        item_html = _drupalgap_form_render_element_item(
-          form,
-          element,
-          variables,
-          item
-        );
-        if (typeof item_html === 'undefined') {
-          render_item = false;
-          return false;
-        }
-    });
+      // Render the element item, unless it wasn't supported.
+      item_html = _drupalgap_form_render_element_item(
+        form,
+        element,
+        variables,
+        item
+      );
+      if (typeof item_html === 'undefined') {
+        render_item = false;
+        return false;
+      }
+
+    }
 
     // Are we skipping the render of the item?
     if (!render_item) { return ''; }
@@ -445,6 +475,9 @@ function _drupalgap_form_render_element_item(form, element, variables, item) {
 
     // Make any preprocess modifications to the elements so they will map
     // cleanly to their theme function.
+    if (typeof variables.attributes['class'] === 'undefined') {
+      variables.attributes['class'] = '';
+    }
     // @todo A hook_field_widget_form() should be used instead here.
     if (item.type == 'submit') {
       variables.attributes.onclick =
@@ -455,15 +488,21 @@ function _drupalgap_form_render_element_item(form, element, variables, item) {
       if (typeof variables.attributes.type === 'undefined') {
         variables.attributes.type = 'button';
       }
-      if (typeof variables.attributes['class'] === 'undefined') {
-        variables.attributes['class'] = '';
-      }
       variables.attributes['class'] += ' dg_form_submit_button ';
     }
 
     // Merge the item into variables.
-    $.extend(true, variables, item);
-
+    if (drupalgap_is_jqm()) {
+      $.extend(true, variables, item);  
+    }
+    else {
+      // @todo bootstrap specific, no no!
+      if (variables.attributes['class'].indexOf('form-control') == -1) {
+        variables.attributes['class'] += ' form-control '
+      }
+      // @TODO need recursive extend here.
+      variables = angular.extend({}, variables, item);
+    }
     // If a value isn't set on variables, try to set it with the default value
     // on the item.
     if (typeof variables.value === 'undefined' || variables.value == null) {
