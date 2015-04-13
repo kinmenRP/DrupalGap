@@ -16,7 +16,7 @@
       <!-- Angular -->
       <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.3.15/angular.min.js"></script>
 
-      <!-- Init Angular App -->
+      <!-- Create Angular App -->
       <script>
         var dg = angular.module('dg', []);
       </script>
@@ -24,12 +24,17 @@
       <!-- jDrupal -->
       <script type="text/javascript" charset="utf-8" src="jdrupal-7.x-1.1.min.js"></script>
       
-      <!-- DrupalGap -->
+      <!-- DrupalGap Core and Settings -->
       <script type="text/javascript" charset="utf-8" src="bin/drupalgap.js"></script>
       <script type="text/javascript" charset="utf-8" src="app/settings.js"></script>
-      <script type="text/javascript" charset="utf-8" src="themes/spi/spi.js"></script>
-      <script type="text/ng-template" id="page.tpl.html" src="themes/spi/page.tpl.html"></script>
       <link rel="stylesheet" href="drupalgap.css" />
+      
+      <!-- DrupalGap Theme -->
+      <script type="text/javascript" charset="utf-8" src="themes/spi/spi.js"></script>
+      <link rel="stylesheet" href="themes/spi/spi.css" />
+      <script type="text/ng-template" id="page.tpl.html" src="themes/spi/page.tpl.html"></script>
+      
+      <!-- DrupalGap On Load Controller -->
       <script>
         dg.controller('drupalgap_onload', ['$scope', '$sce', drupalgap_onload]);
       </script>
