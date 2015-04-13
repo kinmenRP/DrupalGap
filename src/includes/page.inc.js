@@ -452,11 +452,20 @@ function drupalgap_render_page() {
       // Iterate over any remaining variables and theme them.
       // @todo - each remaining variables should have its own container div and
       // unique id, similar to the placeholder div containers mentioned above.
+      var jqm = drupalgap_is_jqm();
       for (var element in output) {
         if (!output.hasOwnProperty(element)) { continue; }
         var variables = output[element];
         if (!in_array(element, render_variables)) {
-          content += theme(variables.theme, variables);
+          if (jqm) {
+            content += theme(variables.theme, variables);
+          }
+          else {
+            // @todo - this is bootstrap specific, bad.
+            content += '<div class="container">' +
+              theme(variables.theme, variables) +
+            '</div>';
+          }
         }
       }
     }
