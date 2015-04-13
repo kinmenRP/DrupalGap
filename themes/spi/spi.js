@@ -9,23 +9,20 @@ function spi_info() {
       regions: {}
     };
     theme.regions['header'] = {
+      format: 'nav', // wrap in a nav element instead of a div
       attributes: {
-        'data-role': 'header',
-        'data-theme': 'b',
-        'data-position': 'fixed'
+        'class': 'navbar navbar-inverse navbar-fixed-top'
       }
     };
     theme.regions['content'] = {
       attributes: {
-        'class': 'ui-content',
-        'role': 'main'
+        'class': ''
       }
     };
     theme.regions['footer'] = {
+      format: 'footer', // wrap in a footer element instead of a div
       attributes: {
-        'data-role': 'footer',
-        'data-theme': 'b',
-        'data-position': 'fixed'
+        'class': 'footer'
       }
     };
     return theme;
