@@ -212,14 +212,16 @@ function image_fields_present_on_entity_type(entity_type, bundle) {
     var results = [];
     var fields = drupalgap_field_info_instances(entity_type, bundle);
     if (!fields) { return false; }
-    $.each(fields, function(name, field) {
-        if (field.widget &&
-          field.widget.type &&
-          field.widget.type == 'image_image'
-        ) {
-          results.push(name);
-        }
-    });
+    for (var name in fields) {
+      if (!fields.hasOwnProperty(name)) { continue; }
+      var field = fields[name];
+      if (field.widget &&
+        field.widget.type &&
+        field.widget.type == 'image_image'
+      ) {
+        results.push(name);
+      }
+    }
     if (results.length == 0) { return false; }
     return results;
   }
