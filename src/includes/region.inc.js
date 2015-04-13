@@ -38,9 +38,14 @@ function drupalgap_render_region(region) {
       // append a system class name for the region onto its attributes array.
       if (!region.attributes['class']) { region.attributes['class'] = ''; }
       region.attributes['class'] += ' region_' + region.name + ' ';
+      
+      var format = region.format ? region.format : 'div';
 
       // Open the region container.
-      region_html += '<div ' + drupalgap_attributes(region.attributes) + '>';
+      region_html += '<' + format + ' ' + drupalgap_attributes(region.attributes) + '>';
+      
+      // @TODO bootstrap specific, no no.
+      if (!drupalgap_is_jqm()) { region_html += '<div class="container">'; }
 
       // If there are any links attached to this region, render them first.
       var region_link_count = 0;
@@ -221,9 +226,11 @@ function drupalgap_render_region(region) {
           region.collapse_on_empty === false
         ) { region_html += '<h2>&nbsp;</h2>'; }
       }
+      
+      if (!drupalgap_is_jqm()) { region_html += '</div>'; }
 
       // Close the region container.
-      region_html += '</div><!-- ' + region.name + ' -->';
+      region_html += '</' + format + '><!-- ' + region.name + ' -->';
 
     }
 
