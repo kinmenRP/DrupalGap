@@ -366,7 +366,9 @@ function bl() {
     }
     else { options = {}; }
     if (!options.attributes) { options.attributes = { }; }
-    options.attributes['data-role'] = 'button';
+    if (drupalgap_is_jqm()) {
+      options.attributes['data-role'] = 'button';  
+    }
     return l(text, path, options);
   }
   catch (error) { console.log('bl - ' + error); }
