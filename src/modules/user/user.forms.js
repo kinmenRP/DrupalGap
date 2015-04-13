@@ -8,6 +8,10 @@ function user_login_form(form, form_state) {
   try {
     form.entity_type = 'user';
     form.bundle = null;
+    if (!drupalgap_is_jqm()) {
+      // @TODO - this is bootstrap specific!
+      form.options.attributes['class'] += ' form-signin ';
+    }
     form.elements.name = {
       type: 'textfield',
       title: 'Username',
