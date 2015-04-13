@@ -537,7 +537,16 @@ function theme_button(variables) {
  */
 function theme_button_link(variables) {
   try {
-    variables.attributes['data-role'] = 'button';
+    if (drupalgap_is_jqm()) {
+      variables.attributes['data-role'] = 'button';  
+    }
+    else {
+      // @TODO this is assuming an angular dev always wants bootstrap as the
+      // frontend, we should allow any frontend. Get flexible gosh darn it!
+      if (variables.attributes['class'].indexOf('btn') == -1) {
+        variables.attributes['class'] += ' btn ';
+      }
+    }
     return theme_link(variables);
   }
   catch (error) { console.log('theme_button_link - ' + error); }
