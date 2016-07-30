@@ -1,4 +1,11 @@
 /**
+ * Implements hook_install().
+ */
+function entity_install() {
+  entity_clean_local_storage();
+}
+
+/**
  * Given an entity type, bundle name, form and entity, this will add the
  * entity's core fields to the form via the DrupalGap forms api.
  * @param {String} entity_type
@@ -128,41 +135,51 @@ function drupalgap_entity_edit_form_delete_confirmation(entity_type,
 function drupalgap_entity_render_content(entity_type, entity) {
   try {
     entity.content = '';
-    // Render each field on the entity, using the default display. The fields
-    // need to be appended according to their weight, so we'll keep track of
-    // the weights and displays, then at the end we'll render them and append
-    // them in order onto the entity's content.
+
+    // Figure out the bundle.
     var bundle = entity.type;
     if (entity_type == 'comment') { bundle = entity.bundle; }
-    else if (entity_type == 'taxonomy_term') {
-      bundle = entity.vocabulary_machine_name;
-    }
+    else if (entity_type == 'taxonomy_term') { bundle = entity.vocabulary_machine_name; }
+
+    // Load the field info for this entity and bundle combo.
     var field_info = drupalgap_field_info_instances(entity_type, bundle);
     if (!field_info) { return; }
+
+    // Give modules a chance to pre build the content.
+    module_invoke_all('entity_pre_build_content', entity, entity_type, bundle);
+
+    // Render each field on the entity, using the drupalgap or default display.
     var field_weights = {};
     var field_displays = {};
     for (var field_name in field_info) {
         if (!field_info.hasOwnProperty(field_name)) { continue; }
         var field = field_info[field_name];
-        // Determine which display mode to use. The default mode will be used
-        // if the drupalgap display mode is not present.
+
+        // Determine which display mode to use. The default mode will be used if the drupalgap display mode is not
+        // present, unless a view mode has been specified in settings.js then we'll use that config for the current
+        // entity/bundle combo. If a module isn't listed on a custom display, use the default display's module.
         if (!field.display) { break; }
         var display = field.display['default'];
-        if (field.display['drupalgap']) {
-          display = field.display['drupalgap'];
-          // If a module isn't listed on the drupalgap display, use the default
-          // display's module.
-          if (
-            typeof display.module === 'undefined' &&
-            typeof field.display['default'].module !== 'undefined'
+        var view_mode = drupalgap_entity_view_mode(entity_type, bundle);
+        if (field.display[view_mode]) {
+          display = field.display[view_mode];
+          if (typeof display.module === 'undefined' && typeof field.display['default'].module !== 'undefined'
           ) { display.module = field.display['default'].module; }
         }
+
         // Skip hidden fields.
         if (display.type == 'hidden') { continue; }
-        // Save the field display and weight.
+
+        // Save the field display and weight. Use the weight from the field's render element if it's available,
+        // otherwise fallback to the weight mentioned in the display.
         field_displays[field_name] = display;
-        field_weights[field_name] = display.weight;
+        field_weights[field_name] = typeof entity[field_name].weight !== 'undefined' ?
+            entity[field_name].weight : display.weight;
     }
+
+    // Give modules a chance to alter the build content.
+    module_invoke_all('entity_post_build_content', entity, entity_type, bundle);
+
     // Extract the field weights and sort them.
     var extracted_weights = [];
     for (var field_name in field_weights) {
@@ -171,6 +188,10 @@ function drupalgap_entity_render_content(entity_type, entity) {
         extracted_weights.push(weight);
     }
     extracted_weights.sort(function(a, b) { return a - b; });
+
+    // Give modules a chance to pre alter the content.
+    module_invoke_all('entity_pre_render_content', entity, entity_type, bundle);
+
     // For each sorted weight, locate the field with the corresponding weight,
     // then render it's field content.
     var completed_fields = [];
@@ -178,7 +199,8 @@ function drupalgap_entity_render_content(entity_type, entity) {
         if (!extracted_weights.hasOwnProperty(weight_index)) { continue; }
         var target_weight = extracted_weights[weight_index];
         for (var field_name in field_weights) {
-            if (!field_weights.hasOwnProperty(field_name)) { continue; }
+            if (!field_weights.hasOwnProperty(field_name) || typeof entity[field_name] === 'undefined') { continue; }
+            if (typeof entity[field_name].access !== 'undefined' && !entity[field_name].access) { continue; }
             var weight = field_weights[field_name];
             if (target_weight == weight) {
               if (completed_fields.indexOf(field_name) == -1) {
@@ -195,21 +217,19 @@ function drupalgap_entity_render_content(entity_type, entity) {
             }
         }
     }
+
     // Give modules a chance to alter the content.
-    module_invoke_all(
-      'entity_post_render_content',
-      entity,
-      entity_type,
-      bundle
-    );
+    module_invoke_all('entity_post_render_content', entity, entity_type, bundle);
+
     // Update this entity in local storage so the content property sticks.
-    if (Drupal.settings.cache.entity.enabled) {
+    if (entity_caching_enabled(entity_type, bundle)) {
       _entity_local_storage_save(
         entity_type,
         entity[entity_primary_key(entity_type)],
         entity
       );
     }
+
   }
   catch (error) {
     console.log('drupalgap_entity_render_content - ' + error);
@@ -460,7 +480,8 @@ function drupalgap_entity_build_from_form_state(form, form_state) {
                   form.elements[name].field_info_instance,
                   language,
                   delta,
-                  field_key
+                  field_key,
+                  form
                 );
               }
 
@@ -500,14 +521,19 @@ function drupalgap_entity_build_from_form_state(form, form_state) {
               // If the field value was null, we won't send along the field, so
               // just remove it. Except for list_boolean fields, they need a
               // null value to set the field value to false.
-              // @TODO - will this cause issues with multi value fields? i.e. if
-              // delta zero is null, but delta one isn't, this will probably
-              // destroy the field, derp.
               if (
                 field_value === null &&
                 typeof entity[name] !== 'undefined' &&
                 form.elements[name].type != 'list_boolean'
-              ) { delete entity[name]; }
+              ) {
+                if (is_field) {
+                  if (delta == 0) { delete entity[name]; }
+                  else if (typeof entity[name][language][delta] !== 'undefined') {
+                    delete entity[name][language][delta];
+                  }
+                }
+                else { delete entity[name]; }
+              }
 
               // If we had an optional select list, and no options were
               // selected, delete the empty field from the assembled entity.
@@ -680,11 +706,6 @@ function drupalgap_entity_get_core_fields(entity_type, bundle) {
           case '2':
             fields['mail'].required = true;
             fields['homepage'].required = true;
-            break;
-          default:
-            console.log('WARNING: drupalgap_entity_get_core_fields - ' +
-              'Unknown anonymous comment setting (' + content_type + '): ' +
-              comment_anonymous);
             break;
         }
         // Only anonymous users get the mail and homepage fields.
@@ -893,18 +914,37 @@ function _drupalgap_entity_page_container_id(entity_type, entity_id, mode) {
  * @param {String} mode
  * @param {Object} build
  */
-function _drupalgap_entity_page_container_inject(entity_type, entity_id, mode,
-  build) {
+function _drupalgap_entity_page_container_inject(entity_type, entity_id, mode, build) {
   try {
     // Get the container id, set the drupalgap.output to the page build, then
     // inject the rendered page into the container.
     var id = _drupalgap_entity_page_container_id(entity_type, entity_id, mode);
+    module_invoke_all('entity_view_alter', entity_type, entity_id, mode, build);
     drupalgap.output = build;
     $('#' + id).html(drupalgap_render_page()).trigger('create');
+    _drupalgap_entity_page_add_css_class_names(entity_type, entity_id, build);
   }
   catch (error) {
     console.log('_drupalgap_entity_page_container_inject - ' + error);
   }
+}
+
+/**
+ * An internal function used to add css class names to an entity's jQM page container.
+ * @param {String} entity_type
+ * @param {Number} entity_id
+ * @param {Object} build
+ * @private
+ */
+function _drupalgap_entity_page_add_css_class_names(entity_type, entity_id, build) {
+  try {
+    var className = entity_type;
+    var bundleName = entity_get_bundle(entity_type, build[entity_type]);
+    if (bundleName) { className += '-' + bundleName; }
+    className += ' ' + entity_type.replace(/_/g, '-') + '-' + entity_id;
+    $('#' + drupalgap_get_page_id()).addClass(className);
+  }
+  catch (error) { console.log('_drupalgap_entity_page_add_css_class_names - ' + error); }
 }
 
 /**

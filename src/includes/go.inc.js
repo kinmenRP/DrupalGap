@@ -102,7 +102,7 @@ function drupalgap_goto(path) {
 
     // Return if we are trying to go to the path we are already on, unless this
     // was a form submission, then we'll let the page rebuild itself. For
-    // accurracy we compare the jQM active page url with the destination page
+    // accuracy we compare the jQM active page url with the destination page
     // id.
     // @todo - this boolean doesn't match the comment description of the code
     // block, i.e. the form_submission check is opposite of what it says
@@ -132,6 +132,7 @@ function drupalgap_goto(path) {
     // page and we're not in the middle of a form submission, prevent the page
     // from processing then change to it.
     if (drupalgap_page_in_dom(page_id)) {
+
       // If there are any hook_menu() item options for this router path, bring
       // them into the current options without overwriting any existing values.
       if (drupalgap.menu_links[router_path].options) {
@@ -141,6 +142,7 @@ function drupalgap_goto(path) {
           options
         );
       }
+
       // Reload the page? If so, remove the page from the DOM, delete the
       // reloadPage option, then set the reloadingPage option to true so others
       // down the line will know the page is reloading. We can't pass along the
@@ -179,13 +181,7 @@ function drupalgap_goto(path) {
     }
 
     // Generate the page.
-    drupalgap_goto_generate_page_and_go(
-      path,
-      page_id,
-      options,
-      drupalgap.menu_links[router_path]
-    );
-
+    drupalgap_goto_generate_page_and_go(path, page_id, options, drupalgap.menu_links[router_path]);
   }
   catch (error) { console.log('drupalgap_goto - ' + error); }
 }
@@ -204,6 +200,10 @@ function drupalgap_goto(path) {
 function drupalgap_goto_generate_page_and_go(
   path, page_id, options, menu_link) {
   try {
+
+    // @TODO using a page.tpl.html is pretty dumb, this makes a disc read on each page change, use render arrays only
+    // be deprecating the page.tpl.html file, converting it to a render array and warning developers to upgrade their
+    // themes.
     var page_template_path = path_to_theme() + '/page.tpl.html';
     if (!drupalgap_file_exists(page_template_path)) {
       console.log(
@@ -221,6 +221,7 @@ function drupalgap_goto_generate_page_and_go(
 
       // Load the page template html file. Determine if we are going to cache
       // the template file or not.
+      // @TODO another disc read here, dumb, use render arrays and deprecate.
       var file_options = {};
       if (drupalgap.settings.cache &&
           drupalgap.settings.cache.theme_registry !== 'undefined' &&
@@ -250,7 +251,7 @@ function drupalgap_goto_generate_page_and_go(
           drupalgap.settings.mode != 'phonegap' ||
           typeof parent.window.ripple === 'function'
         ) { destination = '#' + page_id; }
-        $.mobile.changePage(destination, options);
+        $.mobile.changePage(destination, options); // @see the pagebeforechange handler in page.inc.js
 
         // Invoke all implementations of hook_drupalgap_goto_post_process().
         module_invoke_all('drupalgap_goto_post_process', path);
@@ -348,7 +349,8 @@ function _drupalgap_goto_prepare_path(path) {
  */
 function drupalgap_back() {
   try {
-    if ($('.ui-page-active').attr('id') == drupalgap.settings.front) {
+    var active_page_id = $('.ui-page-active').attr('id');
+    if (active_page_id == drupalgap.settings.front) {
       var msg = t('Exit') + ' ' + drupalgap.settings.title + '?';
       if (drupalgap.settings.exit_message) {
         msg = drupalgap.settings.exit_message;
@@ -357,28 +359,36 @@ function drupalgap_back() {
           confirmCallback: _drupalgap_back_exit
       });
     }
+    else if (active_page_id == '_drupalgap_splash') { return; }
     else { _drupalgap_back(); }
   }
-  catch (error) { console.log('drupalgap_back' + error); }
+  catch (error) { console.log('drupalgap_back - ' + error); }
 }
 
 /**
- * Change the page to the previous page.
+ * An internal function used to change the page to the previous page.
  */
 function _drupalgap_back() {
   try {
     // @WARNING - any changes here (except the history.back() call) need to be
     // reflected into the window "navigate" handler below
     drupalgap.back = true;
-    history.back();
+
+    // Properly handle iOS9 back button clicks, and default back button clicks.
+    if (typeof device !== 'undefined' && device.platform === "iOS" && parseInt(device.version) === 9) {
+      $.mobile.back();
+    }
+    else { history.back(); }
+
+    // Update the path and router path.
+    var from = drupalgap_path_get();
     drupalgap_path_set(drupalgap.back_path.pop());
-    drupalgap_router_path_set(
-      drupalgap_get_menu_link_router_path(
-        drupalgap_path_get()
-      )
-    );
+    var to = drupalgap_path_get();
+    drupalgap_router_path_set(drupalgap_get_menu_link_router_path(to));
+    module_invoke_all('drupalgap_back', from, to);
+
   }
-  catch (error) { console.log('drupalgap_back' + error); }
+  catch (error) { console.log('_drupalgap_back - ' + error); }
 }
 
 /**
@@ -407,15 +417,14 @@ $(window).on('navigate', function(event, data) {
       // back, forward (or undefined, aka moving from splash to front page)
       var direction = data.state.direction;
       if (direction == 'back' && drupalgap.back_path.length > 0) {
-        // @WARNING - any changes here should be reflected into
-        // _drupalgap_back().
+        // @WARNING - any changes here should be reflected into _drupalgap_back().
         drupalgap.back = true;
-        drupalgap_path_set(drupalgap.back_path[drupalgap.back_path.length - 1]);
-        drupalgap_router_path_set(
-          drupalgap_get_menu_link_router_path(
-            drupalgap_path_get()
-          )
-        );
+        // Update the path and router path.
+        var from = drupalgap_path_get();
+        drupalgap_path_set(drupalgap.back_path.pop());
+        var to = drupalgap_path_get();
+        drupalgap_router_path_set(drupalgap_get_menu_link_router_path(to));
+        module_invoke_all('drupalgap_back', from, to);
       }
     }
 

@@ -55,7 +55,11 @@ function user_login_form_submit(form, form_state) {
   try {
     user_login(form_state.values.name, form_state.values.pass, {
       success: function(result) {
-        drupalgap_goto(drupalgap.settings.front);
+        drupalgap_goto(
+            typeof form.action !== 'undefined' ?
+                form.action : drupalgap.settings.front,
+            { reloadPage:true }
+        );
       }
     });
   }
@@ -72,13 +76,13 @@ function user_register_form(form, form_state) {
   try {
     form.entity_type = 'user';
     form.bundle = null;
+    var description = t('Spaces are allowed; punctuation is not allowed except for periods, hyphens, apostrophes, and underscores.');
     form.elements.name = {
       type: 'textfield',
       title: t('Username'),
       title_placeholder: true,
       required: true,
-      description: t('Spaces are allowed; punctuation is not allowed except ' +
-        'for periods, hyphens, apostrophes, and underscores.')
+      description: description
     };
     form.elements.mail = {
       type: 'email',
@@ -86,7 +90,7 @@ function user_register_form(form, form_state) {
       title_placeholder: true,
       required: true
     };
-    // If e-mail verification is not requred, provide password fields and
+    // If e-mail verification is not required, provide password fields and
     // the confirm e-mail address field.
     if (!drupalgap.site_settings.user_email_verification) {
       form.elements.conf_mail = {
@@ -108,8 +112,7 @@ function user_register_form(form, form_state) {
         required: true
       };
     }
-    // @todo - instead of a null bundle, it appears drupal uses the bundle
-    // 'user' instead.
+    // @TODO - instead of a null bundle, it appears drupal uses the bundle 'user' instead.
     drupalgap_field_info_instances_add_to_form('user', null, form, null);
     // Add registration messages to form.
     form.user_register = {
@@ -171,6 +174,8 @@ function user_register_form_submit(form, form_state) {
         var options = {
           title: t('Registered')
         };
+        var destination = typeof form.action !== 'undefined' ?
+            form.action : drupalgap.settings.front;
         // Check if e-mail verification is required or not..
         if (!drupalgap.site_settings.user_email_verification) {
           // E-mail verification not needed, if administrator approval is
@@ -180,7 +185,7 @@ function user_register_form_submit(form, form_state) {
               config.user_mail_register_pending_approval_required_body,
               options
             );
-            drupalgap_goto('');
+            drupalgap_goto(destination);
           }
           else {
             drupalgap_alert(
@@ -196,7 +201,7 @@ function user_register_form_submit(form, form_state) {
                   }
               });
             }
-            else { drupalgap_goto(''); }
+            else { drupalgap_goto(destination); }
           }
         }
         else {
@@ -205,7 +210,7 @@ function user_register_form_submit(form, form_state) {
             config.user_mail_register_email_verification_body,
             options
           );
-          drupalgap_goto('');
+          drupalgap_goto(destination);
         }
       },
       error: function(xhr, status, message) {
