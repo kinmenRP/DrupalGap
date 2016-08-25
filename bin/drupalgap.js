@@ -1,4 +1,4 @@
-/*! drupalgap 2016-07-29 */
+/*! drupalgap 2016-08-15 */
 // Initialize the drupalgap json object.
 var drupalgap = drupalgap || drupalgap_init(); // Do not remove this line.
 
@@ -5697,7 +5697,11 @@ function drupalgap_remove_page_from_dom(page_id) {
     var options = {};
     if (typeof arguments[1] !== 'undefined') { options = arguments[1]; }
     if (current_page_id != page_id || options.force) {
+      var currentPage = $('#' + current_page_id);
+      // Preserve and re-apply style to current page, @see https://github.com/signalpoint/DrupalGap/issues/837
+      var style = $(currentPage).attr('style');
       $('#' + page_id).empty().remove();
+      if (style) { $(currentPage).attr('style', style); }
       var page_index = drupalgap.pages.indexOf(page_id);
       if (page_index > -1) { drupalgap.pages.splice(page_index, 1); }
       // We'll remove the query string, unless we were instructed to leave it.
@@ -6496,9 +6500,9 @@ function theme_item_list(variables) {
     if (variables.items && variables.items.length > 0) {
       var listview = typeof variables.attributes['data-role'] !== 'undefined' &&
         variables.attributes['data-role'] == 'listview';
-      for (var index in variables.items) {
-          if (!variables.items.hasOwnProperty(index)) { continue; }
-          var item = variables.items[index];
+      for (var index = 0; index < variables.items.length; index++) {
+        var item = variables.items[index];
+        if (typeof item === 'string') {
           var icon = null;
           html += '<li';
           if (listview && (icon = $(item).attr('data-icon'))) {
@@ -6507,6 +6511,12 @@ function theme_item_list(variables) {
             html += ' data-icon="' + icon + '"';
           }
           html += '>' + item + '</li>';
+        }
+        else if (typeof item === 'object') {
+          var attributes = item.attributes ? item.attributes : {};
+          var content = item.content ? item.content : '';
+          html += '<li ' + drupalgap_attributes(attributes) + '>' + drupalgap_render(content) + '</li>';
+        }
       }
     }
     html += '</' + type + '>';
@@ -13431,7 +13441,10 @@ function user_login_form(form, form_state) {
       type: 'textfield',
       title: t('Username'),
       title_placeholder: true,
-      required: true
+      required: true,
+      attributes: {
+        autocapitalize: 'none'
+      }
     };
     form.elements.pass = {
       type: 'password',
