@@ -10,7 +10,7 @@ function drupalgap_form_load(form_id) {
 
     // The form's call back function will be equal to the form id.
     var function_name = form_id;
-    if (drupalgap_function_exists(function_name)) {
+    if (function_exists(function_name)) {
 
       // Grab the form's function.
       var fn = window[function_name];
@@ -174,5 +174,5 @@ function _drupalgap_form_load_set_element_defaults(form, language) {
       }
     }
   }
-  catch (error) { console.log('_drupalgap_form_elements_set_defaults - ' + error); }
+  catch (error) { console.log('_drupalgap_form_load_set_element_defaults - ' + error); }
 }
